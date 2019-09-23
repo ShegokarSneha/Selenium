@@ -1,0 +1,9 @@
+package Navigation;
+
+public class Navigation {
+	public static void main(String[] args) throws InterruptedException {
+		
+		
+	}
+
+}

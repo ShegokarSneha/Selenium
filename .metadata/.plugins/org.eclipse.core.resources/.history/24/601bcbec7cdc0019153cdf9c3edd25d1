@@ -1,0 +1,23 @@
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.interactions.Actions;
+
+public class MouseMovement {
+
+	public static void main(String[] args) throws InterruptedException {
+		System.setProperty("webdriver.chrome.driver", "/home/admin1/eclipse-workspace/Selenium/driver/chromedriver");
+		WebDriver driver  = new ChromeDriver();
+		driver.get("https://www.amazon.in");
+		Actions action = new Actions(driver);
+		action.moveToElement(driver.findElement(By.xpath("//span[contains(text(),'Category')]"))).build().perform();
+		Thread.sleep(3000);
+		action.moveToElement(driver.findElement(By.xpath("//span[contains(text(),'Mobiles, Computers')]"))).build().perform();
+		Thread.sleep(3000);
+		driver.close();
+//		driver.findElement(arg0)
+		
+
+	}
+
+}

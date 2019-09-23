@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ReportNG2  Test"
+           tests="2"
+           failures="0"
+           errors="0"
+           skipped="0"
+           time="6.558">
+  <properties />
+  
+  
+            <testcase name="mul_Test" time="3.286" classname="Testing_Pack.Reportngtest2" />
+                <testcase name="div_Test" time="3.272" classname="Testing_Pack.Reportngtest2" />
+      
+</testsuite>

@@ -1,0 +1,24 @@
+package popupHandling;
+
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
+
+public class NotificationPopup {
+
+	public static void main(String[] args) {
+		String filepath = "/Selenium/Facebook.properties";
+		System.setProperty("webdriver.chrome.driver", "/home/admin1/eclipse-workspace/Selenium/driver/chromedriver");
+		ChromeOptions options  = new ChromeOptions();
+		WebDriver driver = new ChromeDriver(options);
+		driver.manage().window().maximize();
+//		driver.get("https://www.facebook.com/");
+		String url = PropertyFile.getProperty(filepath, "Url");
+		driver.get(url);
+		driver.findElement(By.xpath("//input[@placeholder='Email address or phone number']")).sendKeys("");
+		driver.close();
+
+	}
+
+}

@@ -1,0 +1,6 @@
+KEYWORD_PATH = /home/admin1/eclipse-workspace/KeywordDrivenFramework/dataFile/keywords.xlsx
+#URL = https://demo.guru99.com/v4/
+URL = https://www.linkedin.com/login
+USERID=	uid
+PASSWORD = password
+LOGIN_BTN=btnLogin

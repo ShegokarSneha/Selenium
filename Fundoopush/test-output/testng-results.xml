@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testng-results ignored="0" total="1" passed="1" failed="0" skipped="0">
+  <reporter-output>
+  </reporter-output>
+  <suite started-at="2019-09-21T19:07:57 IST" name="Default suite" finished-at="2019-09-21T19:08:38 IST" duration-ms="40804">
+    <groups>
+    </groups>
+    <test started-at="2019-09-21T19:07:57 IST" name="Default test" finished-at="2019-09-21T19:08:38 IST" duration-ms="40804">
+      <class name="scripts.TestFundoopush">
+        <test-method is-config="true" signature="openApplication()[pri:0, instance:scripts.TestFundoopush@5ffead27]" started-at="2019-09-21T19:07:57 IST" name="openApplication" finished-at="2019-09-21T19:08:04 IST" duration-ms="6587" status="PASS">
+          <reporter-output>
+          </reporter-output>
+        </test-method> <!-- openApplication -->
+        <test-method signature="TestFundoo()[pri:0, instance:scripts.TestFundoopush@5ffead27]" started-at="2019-09-21T19:08:04 IST" name="TestFundoo" finished-at="2019-09-21T19:08:35 IST" duration-ms="30647" status="PASS">
+          <reporter-output>
+          </reporter-output>
+        </test-method> <!-- TestFundoo -->
+        <test-method is-config="true" signature="closeApplication()[pri:0, instance:scripts.TestFundoopush@5ffead27]" started-at="2019-09-21T19:08:35 IST" name="closeApplication" finished-at="2019-09-21T19:08:38 IST" duration-ms="3543" status="PASS">
+          <reporter-output>
+          </reporter-output>
+        </test-method> <!-- closeApplication -->
+      </class> <!-- scripts.TestFundoopush -->
+    </test> <!-- Default test -->
+  </suite> <!-- Default suite -->
+</testng-results>

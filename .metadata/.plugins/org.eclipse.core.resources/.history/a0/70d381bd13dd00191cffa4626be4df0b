@@ -1,0 +1,82 @@
+package keywordDriven;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.util.Properties;
+
+import org.apache.poi.ss.usermodel.Workbook;
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.chrome.ChromeDriver;
+
+public class KeywordUtil {
+	WebDriver driver;
+
+	public String[][] fetchDataFromExcel() throws FileNotFoundException {
+		Workbook wb;
+		String[][] data = null;
+		String path = getProperty("File_Path");
+		FileInputStream file = new FileInputStream(new File(path));
+		System.out.println("File Path :"+path);
+		String extension = path.substring(path.indexOf(".")+1);
+		return null;
+	}
+
+	public String getProperty(String text) {
+		String property = "";
+		Properties prop = new Properties();
+		try {
+			prop.load(new FileInputStream("./Keyword.properties"));
+			property = prop.getProperty(text);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return property;
+	}
+
+	public void openApplication() {
+		System.setProperty("webdriver.chrome.driver", "./driver/chromedriver");
+		driver = new ChromeDriver();
+		driver.get(getProperty("Url"));
+	}
+
+	public void fillText(String locator, String locatorvalue, String text) {
+		switch (locator) {
+
+		case "xpath":
+			driver.findElement(By.xpath(locatorvalue)).sendKeys(text);
+			break;
+
+		case "name":
+			driver.findElement(By.xpath(locatorvalue)).sendKeys(text);
+			break;
+
+		case "id":
+			driver.findElement(By.xpath(locatorvalue)).sendKeys(text);
+			break;
+		}
+	}
+
+	public void fillText(String locator, String locatorvalue) {
+
+		switch (locator) {
+
+		case "xpath":
+			driver.findElement(By.xpath(locatorvalue)).click();
+			break;
+
+		case "name":
+			driver.findElement(By.xpath(locatorvalue)).click();
+			break;
+
+		case "id":
+			driver.findElement(By.xpath(locatorvalue)).click();
+			break;
+		}
+	}
+
+	public void driverClose() {
+		driver.close();
+	}
+}

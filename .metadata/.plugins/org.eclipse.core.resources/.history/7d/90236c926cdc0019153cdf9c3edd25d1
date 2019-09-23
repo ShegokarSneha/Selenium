@@ -1,0 +1,86 @@
+package pompages;
+
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.FindBy;
+import org.openqa.selenium.support.PageFactory;
+import org.testng.annotations.Test;
+
+@Test
+public class AddArticle {
+	
+	@FindBy(xpath = "/html/body/app-root/app-dashboard/app-article/div/div[3]/div/mat-icon")
+	private WebElement Add;
+	
+	@FindBy(xpath = "//button[contains(text(),'ADD ARTICLE')]")
+	private WebElement AddArticle;
+	
+	@FindBy(xpath = "//img[@class='ng-tns-c1-0 addImage ng-star-inserted opacity-class']")
+	private WebElement AddImage;
+	
+	@FindBy(xpath = "//textarea[@placeholder='Title']")
+	private WebElement Title;
+	
+	@FindBy(xpath = "//div[@class='ql-editor ql-blank']")
+	private WebElement Description;
+	
+	@FindBy(xpath = "//img[@class='addMedia']")
+	private WebElement AddMedia;
+	
+	@FindBy(xpath = "//input[@id='mat-input-9']")
+	private WebElement RedirectLink;
+	
+	@FindBy(xpath = "//span[@class='mat-button-wrapper']")
+	private WebElement done;
+	
+	@FindBy(xpath = "/html/body/app-root/app-add-article-dialog/div/div/div[2]/i")
+	private WebElement upload;
+	
+	@FindBy(xpath = "//div[4]//img[1]")
+	private WebElement clickRedirect;
+	
+	public AddArticle(WebDriver driver) {
+		PageFactory.initElements(driver, this);
+	}
+	
+	public void clickAdd() {
+		Add.click();
+	}
+	
+	public void addArticle() {
+		AddArticle.click();
+	}
+	
+	public void addTitle() {
+		Title.sendKeys("BBC News");
+	}
+	
+	public void addDescription() {
+		Description.sendKeys("Redirect Link For BBC News");
+	}
+	
+	public void addImage() {
+		AddImage.click();
+	}
+	
+	public void addMedia() {
+		AddMedia.click();
+	}
+	
+	public void clickLink() {
+		clickRedirect.click();
+	}
+	
+	public void addLink() {
+		RedirectLink.sendKeys("https://www.bbc.com/news/world-us-canada-49173804");
+	}
+	
+	public void done() {
+		done.click();
+	}
+	
+	public void upload() {
+		upload.click();
+	}
+
+}

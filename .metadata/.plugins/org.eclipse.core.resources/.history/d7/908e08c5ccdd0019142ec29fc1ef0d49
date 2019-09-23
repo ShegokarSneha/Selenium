@@ -1,0 +1,17 @@
+package recording;
+
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.testng.annotations.BeforeTest;
+
+public class ScreenTestRecording {
+	WebDriver driver;
+	
+	@BeforeTest
+	public void setupDriver() {
+		System.setProperty("webdriver.chrome.driver", "./driver/chromedriver");
+		driver = new ChromeDriver();
+		driver.manage().window().maximize();
+	}
+
+}

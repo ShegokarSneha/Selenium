@@ -1,0 +1,8 @@
+package pompages;
+
+import org.testng.annotations.Test;
+
+@Test
+public class Dashboard {
+
+}

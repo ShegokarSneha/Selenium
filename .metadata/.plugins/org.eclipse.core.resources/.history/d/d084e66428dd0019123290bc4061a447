@@ -1,0 +1,34 @@
+package crossbrowser;
+
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.firefox.FirefoxDriver;
+import org.testng.annotations.Test;
+
+import com.beust.jcommander.Parameter;
+
+
+
+public class VerifyTitle {
+	WebDriver driver;
+	static {
+		System.setProperty("webdriver.gecko.driver", "./driver/geckodriver");
+		System.setProperty("webdriver.chrome.driver", "./driver/chromedriver");
+	}
+	@Test
+	@Parameter("browser")
+	public void verifyPageTitle(String browsername) {
+		if(browsername.equalsIgnoreCase("firefox")) {
+			driver = new FirefoxDriver();
+		}
+		else if(browsername.equalsIgnoreCase("chrome")) {
+			driver = new ChromeDriver();
+		}
+		driver.manage().window().maximize();
+		driver.get("http://www.google.com");
+		System.out.println(driver.getTitle());
+		driver.quit();
+	}
+	
+
+}

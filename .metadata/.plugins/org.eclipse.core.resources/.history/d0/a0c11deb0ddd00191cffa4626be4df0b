@@ -1,0 +1,23 @@
+package keywordDriven;
+
+import java.io.FileInputStream;
+import java.util.Properties;
+
+public class KeywordMethods {
+
+	public String[][] fetchDataFromExcel() {
+		return null;
+	}
+
+	public String fetchDataFromProperty(String text) {
+		String property = "";
+		Properties prop = new Properties();
+		try {
+			prop.load(new FileInputStream("./Keyword.properties"));
+			property = prop.getProperty(text);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return property;
+	}
+}

@@ -1,0 +1,12 @@
+package recording;
+
+import org.testng.annotations.BeforeTest;
+
+public class ScreenTestRecording {
+	
+	@BeforeTest
+	public void setupDriver() {
+		
+	}
+
+}
