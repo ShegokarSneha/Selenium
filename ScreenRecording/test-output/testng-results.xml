@@ -5,23 +5,23 @@
       <![CDATA[Google Site is open]]>
     </line>
   </reporter-output>
-  <suite started-at="2019-09-23T12:08:45 IST" name="Default suite" finished-at="2019-09-23T12:08:51 IST" duration-ms="6119">
+  <suite started-at="2019-09-23T17:58:27 IST" name="Default suite" finished-at="2019-09-23T17:58:33 IST" duration-ms="5848">
     <groups>
     </groups>
-    <test started-at="2019-09-23T12:08:45 IST" name="Default test" finished-at="2019-09-23T12:08:51 IST" duration-ms="6119">
+    <test started-at="2019-09-23T17:58:27 IST" name="Default test" finished-at="2019-09-23T17:58:33 IST" duration-ms="5848">
       <class name="recording.ScreenTestRecording">
-        <test-method is-config="true" signature="setupDriver()[pri:0, instance:recording.ScreenTestRecording@16ec5519]" started-at="2019-09-23T12:08:45 IST" name="setupDriver" finished-at="2019-09-23T12:08:48 IST" duration-ms="2505" status="PASS">
+        <test-method is-config="true" signature="setupDriver()[pri:0, instance:recording.ScreenTestRecording@16ec5519]" started-at="2019-09-23T17:58:27 IST" name="setupDriver" finished-at="2019-09-23T17:58:28 IST" duration-ms="1572" status="PASS">
           <reporter-output>
           </reporter-output>
         </test-method> <!-- setupDriver -->
-        <test-method signature="executingTest()[pri:0, instance:recording.ScreenTestRecording@16ec5519]" started-at="2019-09-23T12:08:48 IST" name="executingTest" finished-at="2019-09-23T12:08:49 IST" duration-ms="1415" status="PASS">
+        <test-method signature="executingTest()[pri:0, instance:recording.ScreenTestRecording@16ec5519]" started-at="2019-09-23T17:58:28 IST" name="executingTest" finished-at="2019-09-23T17:58:29 IST" duration-ms="1085" status="PASS">
           <reporter-output>
             <line>
               <![CDATA[Google Site is open]]>
             </line>
           </reporter-output>
         </test-method> <!-- executingTest -->
-        <test-method is-config="true" signature="endTest()[pri:0, instance:recording.ScreenTestRecording@16ec5519]" started-at="2019-09-23T12:08:49 IST" name="endTest" finished-at="2019-09-23T12:08:51 IST" duration-ms="2171" status="PASS">
+        <test-method is-config="true" signature="endTest()[pri:0, instance:recording.ScreenTestRecording@16ec5519]" started-at="2019-09-23T17:58:29 IST" name="endTest" finished-at="2019-09-23T17:58:33 IST" duration-ms="3164" status="PASS">
           <reporter-output>
           </reporter-output>
         </test-method> <!-- endTest -->

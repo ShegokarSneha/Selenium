@@ -4,9 +4,9 @@
            failures="1"
            errors="0"
            skipped="0"
-           time="6.564">
+           time="6.569">
   <properties />
-            <testcase name="Sub_Test" time="3.268" classname="Testing_Pack.Reportngtest1">
+            <testcase name="Sub_Test" time="3.277" classname="Testing_Pack.Reportngtest1">
                 <failure type="java.lang.AssertionError"
                   message="expected [3] but found [2]"
               >
@@ -51,6 +51,6 @@
           </testcase>
   
   
-            <testcase name="Sum_Test" time="3.296" classname="Testing_Pack.Reportngtest1" />
+            <testcase name="Sum_Test" time="3.292" classname="Testing_Pack.Reportngtest1" />
       
 </testsuite>

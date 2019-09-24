@@ -52,6 +52,9 @@ public class AddArticle {
 
 	@FindBy(xpath = "//span[@class='mat-button-wrapper']")
 	private WebElement videoDone;
+	
+	@FindBy(xpath = "/html[1]/body[1]/app-root[1]/app-add-article-dialog[1]/div[1]/div[1]/div[1]/div[3]/div[2]/img[1]")
+	private WebElement squarecropper;
 
 	public AddArticle(WebDriver driver) {
 		PageFactory.initElements(driver, this);
@@ -103,6 +106,10 @@ public class AddArticle {
 
 	public void uploadVideoLink() {
 		videoDone.click();
+	}
+	
+	public void clickCropper() {
+		squarecropper.click();
 	}
 
 	public static void uploadImage(String fileLocation) {

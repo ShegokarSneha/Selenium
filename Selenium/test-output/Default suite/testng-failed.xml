@@ -3,11 +3,11 @@
 <suite name="Failed suite [Default suite]" guice-stage="DEVELOPMENT">
   <test thread-count="5" name="Default test(failed)">
     <classes>
-      <class name="crossbrowser.CrossB">
+      <class name="toastMessage.ToastMeassageHandling">
         <methods>
-          <include name="VerifyTitle"/>
+          <include name="testToastMessage"/>
         </methods>
-      </class> <!-- crossbrowser.CrossB -->
+      </class> <!-- toastMessage.ToastMeassageHandling -->
     </classes>
   </test> <!-- Default test(failed) -->
 </suite> <!-- Failed suite [Default suite] -->

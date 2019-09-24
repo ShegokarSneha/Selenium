@@ -1,3 +1,5 @@
 ReportNG.disabledListeners=true
 ReportNG.outdir=test-output
+ReportNg.disabledListeners=true
+ReportNg.outdir=/test-output
 eclipse.preferences.version=1
