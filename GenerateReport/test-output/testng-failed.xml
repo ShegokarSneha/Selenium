@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<suite name="Failed suite [SaveReportToExcel]" guice-stage="DEVELOPMENT">
+  <test thread-count="5" name="SaveReportToExcel(failed)">
+    <classes>
+      <class name="TestNgReport.SaveReportToExcel">
+        <methods>
+          <include name="DoLogin"/>
+          <include name="suiteSetUp"/>
+          <include name="suiteTearDown"/>
+        </methods>
+      </class> <!-- TestNgReport.SaveReportToExcel -->
+    </classes>
+  </test> <!-- SaveReportToExcel(failed) -->
+</suite> <!-- Failed suite [SaveReportToExcel] -->

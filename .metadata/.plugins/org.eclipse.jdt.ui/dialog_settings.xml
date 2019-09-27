@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <section name="Workbench">
 	<item key="org.eclipse.jdt.ui.last.selected.execution.enviroment" value="JavaSE-1.8"/>
-	<item key="org.eclipse.jdt.ui.lastextjar" value="/home/admin1/Desktop/upload selenium/selenium jars"/>
+	<item key="org.eclipse.jdt.ui.lastextjar" value="/home/admin1/Desktop/Selenium/poi-4.1.0/ooxml-lib"/>
 	<item key="SearchScopeActionGroup.search_scope_type" value="1"/>
 	<item key="CallHierarchyViewPart.call_mode" value="0"/>
 	<item key="CallHierarchyViewPart.field_mode" value="2"/>
@@ -27,6 +27,7 @@
 	</section>
 	<section name="OptionalMessageDialog.hide.">
 		<item key="org.eclipse.jdt.ui.typecomment.deprecated" value="true"/>
+		<item key="configure_problem_severity_dialog_id" value="false"/>
 	</section>
 	<section name="NewClassWizardPage">
 		<item key="create_constructor" value="false"/>
@@ -53,5 +54,8 @@
 		<item key="updateTextualMatches" value="false"/>
 		<item key="updateQualifiedNames" value="false"/>
 		<item key="patterns" value="*"/>
+	</section>
+	<section name="ClasspathContainerSelectionPage">
+		<item key="index" value="3"/>
 	</section>
 </section>

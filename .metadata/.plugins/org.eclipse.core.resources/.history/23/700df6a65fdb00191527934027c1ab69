@@ -1,8 +1,0 @@
-package Upcasting;
-
-public class FirefoxDriverStart {
-	public static void main(String[] args) throws InterruptedException{
-		
-	}
-
-}
