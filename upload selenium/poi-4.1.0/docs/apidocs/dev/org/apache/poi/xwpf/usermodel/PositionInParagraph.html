@@ -1,0 +1,365 @@
+/
+    const componentView = findComponentView(lView);
+    /** @type {?} */
+    const componentNode = (/** @type {?} */ (componentView[HOST_NODE]));
+    /** @type {?} */
+    let nodeToProject = ((/** @type {?} */ (componentNode.projection)))[selectorIndex];
+    /** @type {?} */
+    let projectedView = (/** @type {?} */ (componentView[PARENT]));
+    /** @type {?} */
+    let projectionNodeIndex = -1;
+    while (nodeToProject) {
+        if (nodeToProject.type === 1 /* Projection */) {
+            // This node is re-projected, so we must go up the tree to get its projected nodes.
+            /** @type {?} */
+            const currentComponentView = findComponentView(projectedView);
+            /** @type {?} */
+            const currentComponentHost = (/** @type {?} */ (currentComponentView[HOST_NODE]));
+            /** @type {?} */
+            const firstProjectedNode = ((/** @type {?} */ (currentComponentHost.projection)))[(/** @type {?} */ (nodeToProject.projection))];
+            if (firstProjectedNode) {
+                projectionNodeStack$1[++projectionNodeIndex] = nodeToProject;
+                projectionNodeStack$1[++projectionNodeIndex] = projectedView;
+                nodeToProject = firstProjectedNode;
+                projectedView = (/** @type {?} */ (currentComponentView[PARENT]));
+                continue;
+            }
+        }
+        else {
+            // This flag must be set now or we won't know that this node is projected
+            // if the nodes are inserted into a container later.
+            nodeToProject.flags |= 2 /* isProjected */;
+            appendProjectedNode(nodeToProject, tProjectionNode, lView, projectedView);
+        }
+        // If we are finished with a list of re-projected nodes, we need to get
+        // back to the root projection node that was re-projected.
+        if (nodeToProject.next === null && projectedView !== (/** @type {?} */ (componentView[PARENT]))) {
+            projectedView = (/** @type {?} */ (projectionNodeStack$1[projectionNodeIndex--]));
+            nodeToProject = (/** @type {?} */ (projectionNodeStack$1[projectionNodeIndex--]));
+        }
+        nodeToProject = nodeToProject.next;
+    }
+}
+/**
+ * Adds LView or LContainer to the end of the current view tree.
+ *
+ * This structure will be used to traverse through nested views to remove listeners
+ * and call onDestroy callbacks.
+ *
+ * @template T
+ * @param {?} lView The view where LView or LContainer should be added
+ * @param {?} adjustedHostIndex Index of the view's host node in LView[], adjusted for header
+ * @param {?} state The LView or LContainer to add to the view tree
+ * @return {?} The state passed in
+ */
+function addToViewTree(lView, adjustedHostIndex, state) {
+    /** @type {?} */
+    const tView = lView[TVIEW];
+    /** @type {?} */
+    const firstTemplatePass = getFirstTemplatePass();
+    if (lView[TAIL]) {
+        (/** @type {?} */ (lView[TAIL]))[NEXT] = state;
+    }
+    else if (firstTemplatePass) {
+        tView.childIndex = adjustedHostIndex;
+    }
+    lView[TAIL] = state;
+    return state;
+}
+///////////////////////////////
+//// Change detection
+///////////////////////////////
+/**
+ * If node is an OnPush component, marks its LView dirty.
+ * @param {?} lView
+ * @param {?} viewIndex
+ * @return {?}
+ */
+function markDirtyIfOnPush(lView, viewIndex) {
+    /** @type {?} */
+    const childComponentLView = getComponentViewByIndex(viewIndex, lView);
+    if (!(childComponentLView[FLAGS] & 4 /* CheckAlways */)) {
+        childComponentLView[FLAGS] |= 8 /* Dirty */;
+    }
+}
+/**
+ * Wraps an event listener with preventDefault behavior.
+ * @param {?} listenerFn
+ * @return {?}
+ */
+function wrapListenerWithPreventDefault(listenerFn) {
+    return function wrapListenerIn_preventDefault(e) {
+        if (listenerFn(e) === false) {
+            e.preventDefault();
+            // Necessary for legacy browsers that don't support preventDefault (e.g. IE)
+            e.returnValue = false;
+        }
+    };
+}
+/**
+ * Marks current view and all ancestors dirty
+ * @param {?} lView
+ * @return {?}
+ */
+function markViewDirty(lView) {
+    while (lView && !(lView[FLAGS] & 128 /* IsRoot */)) {
+        lView[FLAGS] |= 8 /* Dirty */;
+        lView = (/** @type {?} */ (lView[PARENT]));
+    }
+    lView[FLAGS] |= 8 /* Dirty */;
+    ngDevMode && assertDefined(lView[CONTEXT], 'rootContext should be defined');
+    /** @type {?} */
+    const rootContext = (/** @type {?} */ (lView[CONTEXT]));
+    scheduleTick(rootContext, 1 /* DetectChanges */);
+}
+/**
+ * Used to schedule change detection on the whole application.
+ *
+ * Unlike `tick`, `scheduleTick` coalesces multiple calls into one change detection run.
+ * It is usually called indirectly by calling `markDirty` when the view needs to be
+ * re-rendered.
+ *
+ * Typically `scheduleTick` uses `requestAnimationFrame` to coalesce multiple
+ * `scheduleTick` requests. The scheduling function can be overridden in
+ * `renderComponent`'s `scheduler` option.
+ * @template T
+ * @param {?} rootContext
+ * @param {?} flags
+ * @return {?}
+ */
+function scheduleTick(rootContext, flags) {
+    /** @type {?} */
+    const nothingScheduled = rootContext.flags === 0 /* Empty */;
+    rootContext.flags |= flags;
+    if (nothingScheduled && rootContext.clean == _CLEAN_PROMISE) {
+        /** @type {?} */
+        let res;
+        rootContext.clean = new Promise((r) => res = r);
+        rootContext.scheduler(() => {
+            if (rootContext.flags & 1 /* DetectChanges */) {
+                rootContext.flags &= ~1 /* DetectChanges */;
+                tickRootContext(rootContext);
+            }
+            if (rootContext.flags & 2 /* FlushPlayers */) {
+                rootContext.flags &= ~2 /* FlushPlayers */;
+                /** @type {?} */
+                const playerHandler = rootContext.playerHandler;
+                if (playerHandler) {
+                    playerHandler.flushPlayers();
+                }
+            }
+            rootContext.clean = _CLEAN_PROMISE;
+            (/** @type {?} */ (res))(null);
+        });
+    }
+}
+/**
+ * @param {?} rootContext
+ * @return {?}
+ */
+function tickRootContext(rootContext) {
+    for (let i = 0; i < rootContext.components.length; i++) {
+        /** @type {?} */
+        const rootComponent = rootContext.components[i];
+        renderComponentOrTemplate((/** @type {?} */ (readPatchedLView(rootComponent))), rootComponent);
+    }
+}
+/**
+ * Synchronously perform change detection on a component (and possibly its sub-components).
+ *
+ * This function triggers change detection in a synchronous way on a component. There should
+ * be very little reason to call this function directly since a preferred way to do change
+ * detection is to {\@link markDirty} the component and wait for the scheduler to call this method
+ * at some future point in time. This is because a single user action often results in many
+ * components being invalidated and calling change detection on each component synchronously
+ * would be inefficient. It is better to wait until all components are marked as dirty and
+ * then perform single change detection across all of the components
+ *
+ * @template T
+ * @param {?} component The component which the change detection should be performed on.
+ * @return {?}
+ */
+function detectChanges(component) {
+    /** @type {?} */
+    const view = (/** @type {?} */ (getComponentViewByInstance(component)));
+    detectChangesInternal(view, component);
+}
+/**
+ * @template T
+ * @param {?} view
+ * @param {?} context
+ * @return {?}
+ */
+function detectChangesInternal(view, context) {
+    /** @type {?} */
+    const rendererFactory = view[RENDERER_FACTORY];
+    if (rendererFactory.begin)
+        rendererFactory.begin();
+    if (isCreationMode(view)) {
+        checkView(view, context); // creation mode pass
+    }
+    checkView(view, context); // update mode pass
+    if (rendererFactory.end)
+        rendererFactory.end();
+}
+/**
+ * Synchronously perform change detection on a root view and its components.
+ *
+ * @param {?} lView The view which the change detection should be performed on.
+ * @return {?}
+ */
+function detectChangesInRootView(lView) {
+    tickRootContext((/** @type {?} */ (lView[CONTEXT])));
+}
+/**
+ * Checks the change detector and its children, and throws if any changes are detected.
+ *
+ * This is used in development mode to verify that running change detection doesn't
+ * introduce other changes.
+ * @template T
+ * @param {?} component
+ * @return {?}
+ */
+function checkNoChanges(component) {
+    setCheckNoChangesMode(true);
+    try {
+        detectChanges(component);
+    }
+    finally {
+        setCheckNoChangesMode(false);
+    }
+}
+/**
+ * Checks the change detector on a root view and its components, and throws if any changes are
+ * detected.
+ *
+ * This is used in development mode to verify that running change detection doesn't
+ * introduce other changes.
+ *
+ * @param {?} lView The view which the change detection should be checked on.
+ * @return {?}
+ */
+function checkNoChangesInRootView(lView) {
+    setCheckNoChangesMode(true);
+    try {
+        detectChangesInRootView(lView);
+    }
+    finally {
+        setCheckNoChangesMode(false);
+    }
+}
+/**
+ * Checks the view of the component provided. Does not gate on dirty checks or execute doCheck.
+ * @template T
+ * @param {?} hostView
+ * @param {?} component
+ * @return {?}
+ */
+function checkView(hostView, component) {
+    /** @type {?} */
+    const hostTView = hostView[TVIEW];
+    /** @type {?} */
+    const oldView = enterView(hostView, hostView[HOST_NODE]);
+    /** @type {?} */
+    const templateFn = (/** @type {?} */ (hostTView.template));
+    /** @type {?} */
+    const viewQuery = hostTView.viewQuery;
+    try {
+        namespaceHTML();
+        createViewQuery(viewQuery, hostView, component);
+        templateFn(getRenderFlags(hostView), component);
+        refreshDescendantViews(hostView);
+        updateViewQuery(viewQuery, hostView, component);
+    }
+    finally {
+        leaveView(oldView);
+    }
+}
+/**
+ * @template T
+ * @param {?} viewQuery
+ * @param {?} view
+ * @param {?} component
+ * @return {?}
+ */
+function createViewQuery(viewQuery, view, component) {
+    if (viewQuery && isCreationMode(view)) {
+        viewQuery(1 /* Create */, component);
+    }
+}
+/**
+ * @template T
+ * @param {?} viewQuery
+ * @param {?} view
+ * @param {?} component
+ * @return {?}
+ */
+function updateViewQuery(viewQuery, view, component) {
+    if (viewQuery && !isCreationMode(view)) {
+        viewQuery(2 /* Update */, component);
+    }
+}
+/**
+ * Mark the component as dirty (needing change detection).
+ *
+ * Marking a component dirty will schedule a change detection on this
+ * component at some point in the future. Marking an already dirty
+ * component as dirty is a noop. Only one outstanding change detection
+ * can be scheduled per component tree. (Two components bootstrapped with
+ * separate `renderComponent` will have separate schedulers)
+ *
+ * When the root component is bootstrapped with `renderComponent`, a scheduler
+ * can be provided.
+ *
+ * \@publicApi
+ * @template T
+ * @param {?} component Component to mark as dirty.
+ *
+ * @return {?}
+ */
+function markDirty(component) {
+    ngDevMode && assertDefined(component, 'component');
+    markViewDirty(getComponentViewByInstance(component));
+}
+///////////////////////////////
+//// Bindings & interpolations
+///////////////////////////////
+/**
+ * Creates a single value binding.
+ *
+ * @template T
+ * @param {?} value Value to diff
+ * @return {?}
+ */
+function bind(value) {
+    /** @type {?} */
+    const lView = getLView();
+    return bindingUpdated(lView, lView[BINDING_INDEX]++, value) ? value : NO_CHANGE;
+}
+/**
+ * Allocates the necessary amount of slots for host vars.
+ *
+ * @param {?} count Amount of vars to be allocated
+ * @return {?}
+ */
+function allocHostVars(count) {
+    if (!getFirstTemplatePass())
+        return;
+    /** @type {?} */
+    const lView = getLView();
+    /** @type {?} */
+    const tView = lView[TVIEW];
+    queueHostBindingForCheck(tView, (/** @type {?} */ (getCurrentDirectiveDef())), count);
+    prefillHostVars(tView, lView, count);
+}
+/**
+ * Create interpolation bindings with a variable number of expressions.
+ *
+ * If there are 1 to 8 expressions `interpolation1()` to `interpolation8()` should be used instead.
+ * Those are faster because there is no need to create an array of expressions and iterate over it.
+ *
+ * `values`:
+ * - has static text at even indexes,
+ * - has evaluated expressions at odd indexes.
+ *
+ * Returns the concatenated string wh

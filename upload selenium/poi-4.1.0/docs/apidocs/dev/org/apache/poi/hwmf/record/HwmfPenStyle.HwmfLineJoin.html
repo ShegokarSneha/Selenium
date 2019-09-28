@@ -1,0 +1,449 @@
+hen set to a non-zero value will cause fetching to terminate after the given time has passed. When the time has passed, the
+     * request has not yet completed, and the synchronous flag is unset, a timeout event will then be dispatched, or a
+     * "TimeoutError" DOMException will be thrown otherwise (for the send() method).
+     * When set: throws an "InvalidAccessError" DOMException if the synchronous flag is set and current global object is a Window object.
+     */
+    timeout: number;
+    /**
+     * Returns the associated XMLHttpRequestUpload object. It can be used to gather transmission information when data is
+     * transferred to a server.
+     */
+    readonly upload: XMLHttpRequestUpload;
+    /**
+     * True when credentials are to be included in a cross-origin request. False when they are
+     * to be excluded in a cross-origin request and when cookies are to be ignored in its response.
+     * Initially false.
+     * When set: throws an "InvalidStateError" DOMException if state is not unsent or opened, or if the send() flag is set.
+     */
+    withCredentials: boolean;
+    /**
+     * Cancels any network activity.
+     */
+    abort(): void;
+    getAllResponseHeaders(): string;
+    getResponseHeader(name: string): string | null;
+    /**
+     * Sets the request method, request URL, and synchronous flag.
+     * Throws a "SyntaxError" DOMException if either method is not a
+     * valid HTTP method or url cannot be parsed.
+     * Throws a "SecurityError" DOMException if method is a
+     * case-insensitive match for `CONNECT`, `TRACE`, or `TRACK`.
+     * Throws an "InvalidAccessError" DOMException if async is false, current global object is a Window object, and the timeout attribute is not zero or the responseType attribute is not the empty string.
+     */
+    open(method: string, url: string): void;
+    open(method: string, url: string, async: boolean, username?: string | null, password?: string | null): void;
+    /**
+     * Acts as if the `Content-Type` header value for response is mime.
+     * (It does not actually change the header though.)
+     * Throws an "InvalidStateError" DOMException if state is loading or done.
+     */
+    overrideMimeType(mime: string): void;
+    /**
+     * Initiates the request. The optional argument provides the request body. The argument is ignored if request method is GET or HEAD.
+     * Throws an "InvalidStateError" DOMException if either state is not opened or the send() flag is set.
+     */
+    send(body?: Document | BodyInit | null): void;
+    /**
+     * Combines a header in author request headers.
+     * Throws an "InvalidStateError" DOMException if either state is not opened or the send() flag is set.
+     * Throws a "SyntaxError" DOMException if name is not a header name
+     * or if value is not a header value.
+     */
+    setRequestHeader(name: string, value: string): void;
+    readonly DONE: number;
+    readonly HEADERS_RECEIVED: number;
+    readonly LOADING: number;
+    readonly OPENED: number;
+    readonly UNSENT: number;
+    addEventListener<K extends keyof XMLHttpRequestEventMap>(type: K, listener: (this: XMLHttpRequest, ev: XMLHttpRequestEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
+    addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
+    removeEventListener<K extends keyof XMLHttpRequestEventMap>(type: K, listener: (this: XMLHttpRequest, ev: XMLHttpRequestEventMap[K]) => any, options?: boolean | EventListenerOptions): void;
+    removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
+}
+
+declare var XMLHttpRequest: {
+    prototype: XMLHttpRequest;
+    new(): XMLHttpRequest;
+    readonly DONE: number;
+    readonly HEADERS_RECEIVED: number;
+    readonly LOADING: number;
+    readonly OPENED: number;
+    readonly UNSENT: number;
+};
+
+interface XMLHttpRequestEventTargetEventMap {
+    "abort": ProgressEvent;
+    "error": ProgressEvent;
+    "load": ProgressEvent;
+    "loadend": ProgressEvent;
+    "loadstart": ProgressEvent;
+    "progress": ProgressEvent;
+    "timeout": ProgressEvent;
+}
+
+interface XMLHttpRequestEventTarget extends EventTarget {
+    onabort: ((this: XMLHttpRequest, ev: ProgressEvent) => any) | null;
+    onerror: ((this: XMLHttpRequest, ev: ProgressEvent) => any) | null;
+    onload: ((this: XMLHttpRequest, ev: ProgressEvent) => any) | null;
+    onloadend: ((this: XMLHttpRequest, ev: ProgressEvent) => any) | null;
+    onloadstart: ((this: XMLHttpRequest, ev: ProgressEvent) => any) | null;
+    onprogress: ((this: XMLHttpRequest, ev: ProgressEvent) => any) | null;
+    ontimeout: ((this: XMLHttpRequest, ev: ProgressEvent) => any) | null;
+    addEventListener<K extends keyof XMLHttpRequestEventTargetEventMap>(type: K, listener: (this: XMLHttpRequestEventTarget, ev: XMLHttpRequestEventTargetEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
+    addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
+    removeEventListener<K extends keyof XMLHttpRequestEventTargetEventMap>(type: K, listener: (this: XMLHttpRequestEventTarget, ev: XMLHttpRequestEventTargetEventMap[K]) => any, options?: boolean | EventListenerOptions): void;
+    removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
+}
+
+declare var XMLHttpRequestEventTarget: {
+    prototype: XMLHttpRequestEventTarget;
+    new(): XMLHttpRequestEventTarget;
+};
+
+interface XMLHttpRequestUpload extends XMLHttpRequestEventTarget {
+    addEventListener<K extends keyof XMLHttpRequestEventTargetEventMap>(type: K, listener: (this: XMLHttpRequestUpload, ev: XMLHttpRequestEventTargetEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
+    addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
+    removeEventListener<K extends keyof XMLHttpRequestEventTargetEventMap>(type: K, listener: (this: XMLHttpRequestUpload, ev: XMLHttpRequestEventTargetEventMap[K]) => any, options?: boolean | EventListenerOptions): void;
+    removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
+}
+
+declare var XMLHttpRequestUpload: {
+    prototype: XMLHttpRequestUpload;
+    new(): XMLHttpRequestUpload;
+};
+
+interface XMLSerializer {
+    serializeToString(root: Node): string;
+}
+
+declare var XMLSerializer: {
+    prototype: XMLSerializer;
+    new(): XMLSerializer;
+};
+
+interface XPathEvaluator {
+    createExpression(expression: string, resolver: XPathNSResolver): XPathExpression;
+    createNSResolver(nodeResolver?: Node): XPathNSResolver;
+    evaluate(expression: string, contextNode: Node, resolver: XPathNSResolver | ((prefix: string) => string | null) | null, type: number, result: XPathResult | null): XPathResult;
+}
+
+declare var XPathEvaluator: {
+    prototype: XPathEvaluator;
+    new(): XPathEvaluator;
+};
+
+interface XPathExpression {
+    evaluate(contextNode: Node, type: number, result: XPathResult | null): XPathResult;
+}
+
+declare var XPathExpression: {
+    prototype: XPathExpression;
+    new(): XPathExpression;
+};
+
+interface XPathNSResolver {
+    lookupNamespaceURI(prefix: string): string | null;
+}
+
+declare var XPathNSResolver: {
+    prototype: XPathNSResolver;
+    new(): XPathNSResolver;
+};
+
+interface XPathResult {
+    readonly booleanValue: boolean;
+    readonly invalidIteratorState: boolean;
+    readonly numberValue: number;
+    readonly resultType: number;
+    readonly singleNodeValue: Node;
+    readonly snapshotLength: number;
+    readonly stringValue: string;
+    iterateNext(): Node;
+    snapshotItem(index: number): Node;
+    readonly ANY_TYPE: number;
+    readonly ANY_UNORDERED_NODE_TYPE: number;
+    readonly BOOLEAN_TYPE: number;
+    readonly FIRST_ORDERED_NODE_TYPE: number;
+    readonly NUMBER_TYPE: number;
+    readonly ORDERED_NODE_ITERATOR_TYPE: number;
+    readonly ORDERED_NODE_SNAPSHOT_TYPE: number;
+    readonly STRING_TYPE: number;
+    readonly UNORDERED_NODE_ITERATOR_TYPE: number;
+    readonly UNORDERED_NODE_SNAPSHOT_TYPE: number;
+}
+
+declare var XPathResult: {
+    prototype: XPathResult;
+    new(): XPathResult;
+    readonly ANY_TYPE: number;
+    readonly ANY_UNORDERED_NODE_TYPE: number;
+    readonly BOOLEAN_TYPE: number;
+    readonly FIRST_ORDERED_NODE_TYPE: number;
+    readonly NUMBER_TYPE: number;
+    readonly ORDERED_NODE_ITERATOR_TYPE: number;
+    readonly ORDERED_NODE_SNAPSHOT_TYPE: number;
+    readonly STRING_TYPE: number;
+    readonly UNORDERED_NODE_ITERATOR_TYPE: number;
+    readonly UNORDERED_NODE_SNAPSHOT_TYPE: number;
+};
+
+interface XSLTProcessor {
+    clearParameters(): void;
+    getParameter(namespaceURI: string, localName: string): any;
+    importStylesheet(style: Node): void;
+    removeParameter(namespaceURI: string, localName: string): void;
+    reset(): void;
+    setParameter(namespaceURI: string, localName: string, value: any): void;
+    transformToDocument(source: Node): Document;
+    transformToFragment(source: Node, document: Document): DocumentFragment;
+}
+
+declare var XSLTProcessor: {
+    prototype: XSLTProcessor;
+    new(): XSLTProcessor;
+};
+
+interface webkitRTCPeerConnection extends RTCPeerConnection {
+    addEventListener<K extends keyof RTCPeerConnectionEventMap>(type: K, listener: (this: webkitRTCPeerConnection, ev: RTCPeerConnectionEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
+    addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
+    removeEventListener<K extends keyof RTCPeerConnectionEventMap>(type: K, listener: (this: webkitRTCPeerConnection, ev: RTCPeerConnectionEventMap[K]) => any, options?: boolean | EventListenerOptions): void;
+    removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
+}
+
+declare var webkitRTCPeerConnection: {
+    prototype: webkitRTCPeerConnection;
+    new(configuration: RTCConfiguration): webkitRTCPeerConnection;
+};
+
+declare type EventListenerOrEventListenerObject = EventListener | EventListenerObject;
+
+interface BlobCallback {
+    (blob: Blob | null): void;
+}
+
+interface DecodeErrorCallback {
+    (error: DOMException): void;
+}
+
+interface DecodeSuccessCallback {
+    (decodedData: AudioBuffer): void;
+}
+
+interface ErrorEventHandler {
+    (event: Event | string, source?: string, fileno?: number, columnNumber?: number, error?: Error): void;
+}
+
+interface EventHandlerNonNull {
+    (event: Event): any;
+}
+
+interface ForEachCallback {
+    (keyId: Int8Array | Int16Array | Int32Array | Uint8Array | Uint16Array | Uint32Array | Uint8ClampedArray | Float32Array | Float64Array | DataView | ArrayBuffer | null, status: MediaKeyStatus): void;
+}
+
+interface FrameRequestCallback {
+    (time: number): void;
+}
+
+interface FunctionStringCallback {
+    (data: string): void;
+}
+
+interface IntersectionObserverCallback {
+    (entries: IntersectionObserverEntry[], observer: IntersectionObserver): void;
+}
+
+interface MSLaunchUriCallback {
+    (): void;
+}
+
+interface MutationCallback {
+    (mutations: MutationRecord[], observer: MutationObserver): void;
+}
+
+interface NavigatorUserMediaErrorCallback {
+    (error: MediaStreamError): void;
+}
+
+interface NavigatorUserMediaSuccessCallback {
+    (stream: MediaStream): void;
+}
+
+interface NotificationPermissionCallback {
+    (permission: NotificationPermission): void;
+}
+
+interface OnBeforeUnloadEventHandlerNonNull {
+    (event: Event): string | null;
+}
+
+interface OnErrorEventHandlerNonNull {
+    (event: Event | string, source?: string, lineno?: number, colno?: number, error?: any): any;
+}
+
+interface PerformanceObserverCallback {
+    (entries: PerformanceObserverEntryList, observer: PerformanceObserver): void;
+}
+
+interface PositionCallback {
+    (position: Position): void;
+}
+
+interface PositionErrorCallback {
+    (positionError: PositionError): void;
+}
+
+interface QueuingStrategySizeCallback<T = any> {
+    (chunk: T): number;
+}
+
+interface RTCPeerConnectionErrorCallback {
+    (error: DOMException): void;
+}
+
+interface RTCSessionDescriptionCallback {
+    (description: RTCSessionDescriptionInit): void;
+}
+
+interface RTCStatsCallback {
+    (report: RTCStatsReport): void;
+}
+
+interface ReadableByteStreamControllerCallback {
+    (controller: ReadableByteStreamController): void | PromiseLike<void>;
+}
+
+interface ReadableStreamDefaultControllerCallback<R> {
+    (controller: ReadableStreamDefaultController<R>): void | PromiseLike<void>;
+}
+
+interface ReadableStreamErrorCallback {
+    (reason: any): void | PromiseLike<void>;
+}
+
+interface TransformStreamDefaultControllerCallback<O> {
+    (controller: TransformStreamDefaultController<O>): void | PromiseLike<void>;
+}
+
+interface TransformStreamDefaultControllerTransformCallback<I, O> {
+    (chunk: I, controller: TransformStreamDefaultController<O>): void | PromiseLike<void>;
+}
+
+interface VoidFunction {
+    (): void;
+}
+
+interface WritableStreamDefaultControllerCloseCallback {
+    (): void | PromiseLike<void>;
+}
+
+interface WritableStreamDefaultControllerStartCallback {
+    (controller: WritableStreamDefaultController): void | PromiseLike<void>;
+}
+
+interface WritableStreamDefaultControllerWriteCallback<W> {
+    (chunk: W, controller: WritableStreamDefaultController): void | PromiseLike<void>;
+}
+
+interface WritableStreamErrorCallback {
+    (reason: any): void | PromiseLike<void>;
+}
+
+interface HTMLElementTagNameMap {
+    "a": HTMLAnchorElement;
+    "abbr": HTMLElement;
+    "address": HTMLElement;
+    "applet": HTMLAppletElement;
+    "area": HTMLAreaElement;
+    "article": HTMLElement;
+    "aside": HTMLElement;
+    "audio": HTMLAudioElement;
+    "b": HTMLElement;
+    "base": HTMLBaseElement;
+    "basefont": HTMLBaseFontElement;
+    "bdo": HTMLElement;
+    "blockquote": HTMLQuoteElement;
+    "body": HTMLBodyElement;
+    "br": HTMLBRElement;
+    "button": HTMLButtonElement;
+    "canvas": HTMLCanvasElement;
+    "caption": HTMLTableCaptionElement;
+    "cite": HTMLElement;
+    "code": HTMLElement;
+    "col": HTMLTableColElement;
+    "colgroup": HTMLTableColElement;
+    "data": HTMLDataElement;
+    "datalist": HTMLDataListElement;
+    "dd": HTMLElement;
+    "del": HTMLModElement;
+    "details": HTMLDetailsElement;
+    "dfn": HTMLElement;
+    "dialog": HTMLDialogElement;
+    "dir": HTMLDirectoryElement;
+    "div": HTMLDivElement;
+    "dl": HTMLDListElement;
+    "dt": HTMLElement;
+    "em": HTMLElement;
+    "embed": HTMLEmbedElement;
+    "fieldset": HTMLFieldSetElement;
+    "figcaption": HTMLElement;
+    "figure": HTMLElement;
+    "font": HTMLFontElement;
+    "footer": HTMLElement;
+    "form": HTMLFormElement;
+    "frame": HTMLFrameElement;
+    "frameset": HTMLFrameSetElement;
+    "h1": HTMLHeadingElement;
+    "h2": HTMLHeadingElement;
+    "h3": HTMLHeadingElement;
+    "h4": HTMLHeadingElement;
+    "h5": HTMLHeadingElement;
+    "h6": HTMLHeadingElement;
+    "head": HTMLHeadElement;
+    "header": HTMLElement;
+    "hgroup": HTMLElement;
+    "hr": HTMLHRElement;
+    "html": HTMLHtmlElement;
+    "i": HTMLElement;
+    "iframe": HTMLIFrameElement;
+    "img": HTMLImageElement;
+    "input": HTMLInputElement;
+    "ins": HTMLModElement;
+    "kbd": HTMLElement;
+    "label": HTMLLabelElement;
+    "legend": HTMLLegendElement;
+    "li": HTMLLIElement;
+    "link": HTMLLinkElement;
+    "map": HTMLMapElement;
+    "mark": HTMLElement;
+    "marquee": HTMLMarqueeElement;
+    "menu": HTMLMenuElement;
+    "meta": HTMLMetaElement;
+    "meter": HTMLMeterElement;
+    "nav": HTMLElement;
+    "noscript": HTMLElement;
+    "object": HTMLObjectElement;
+    "ol": HTMLOListElement;
+    "optgroup": HTMLOptGroupElement;
+    "option": HTMLOptionElement;
+    "output": HTMLOutputElement;
+    "p": HTMLParagraphElement;
+    "param": HTMLParamElement;
+    "picture": HTMLPictureElement;
+    "pre": HTMLPreElement;
+    "progress": HTMLProgressElement;
+    "q": HTMLQuoteElement;
+    "rt": HTMLElement;
+    "ruby": HTMLElement;
+    "s": HTMLElement;
+    "samp": HTMLElement;
+    "script": HTMLScriptElement;
+    "section": HTMLElement;
+    "select": HTMLSelectElement;
+    "slot": HTMLSlotElement;
+    "small": HTMLElement;
+    "source": HTMLSourceElement;
+    "span": HTMLSpanElement;
+    "strong": HTMLElement;
+    "style": HTMLStyleElement;
+    "su

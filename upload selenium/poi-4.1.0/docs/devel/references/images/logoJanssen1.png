@@ -1,0 +1,259 @@
+") {
+            in_class = true;
+            source += ch;
+        } else if (ch == "]" && in_class) {
+            in_class = false;
+            source += ch;
+        } else if (ch == "/" && !in_class) {
+            break;
+        } else if (ch == "\\") {
+            prev_backslash = true;
+        } else {
+            source += ch;
+        }
+        var mods = read_name();
+        try {
+            var regexp = new RegExp(source, mods);
+            regexp.raw_source = source;
+            return token("regexp", regexp);
+        } catch(e) {
+            parse_error(e.message);
+        }
+    });
+
+    function read_operator(prefix) {
+        function grow(op) {
+            if (!peek()) return op;
+            var bigger = op + peek();
+            if (OPERATORS[bigger]) {
+                next();
+                return grow(bigger);
+            } else {
+                return op;
+            }
+        }
+        return token("operator", grow(prefix || next()));
+    }
+
+    function handle_slash() {
+        next();
+        switch (peek()) {
+          case "/":
+            next();
+            return skip_line_comment("comment1");
+          case "*":
+            next();
+            return skip_multiline_comment();
+        }
+        return S.regex_allowed ? read_regexp("") : read_operator("/");
+    }
+
+    function handle_dot() {
+        next();
+        return is_digit(peek().charCodeAt(0))
+            ? read_num(".")
+            : token("punc", ".");
+    }
+
+    function read_word() {
+        var word = read_name();
+        if (prev_was_dot) return token("name", word);
+        return KEYWORDS_ATOM[word] ? token("atom", word)
+            : !KEYWORDS[word] ? token("name", word)
+            : OPERATORS[word] ? token("operator", word)
+            : token("keyword", word);
+    }
+
+    function with_eof_error(eof_error, cont) {
+        return function(x) {
+            try {
+                return cont(x);
+            } catch(ex) {
+                if (ex === EX_EOF) parse_error(eof_error);
+                else throw ex;
+            }
+        };
+    }
+
+    function next_token(force_regexp) {
+        if (force_regexp != null)
+            return read_regexp(force_regexp);
+        if (shebang && S.pos == 0 && looking_at("#!")) {
+            start_token();
+            forward(2);
+            skip_line_comment("comment5");
+        }
+        for (;;) {
+            skip_whitespace();
+            start_token();
+            if (html5_comments) {
+                if (looking_at("<!--")) {
+                    forward(4);
+                    skip_line_comment("comment3");
+                    continue;
+                }
+                if (looking_at("-->") && S.newline_before) {
+                    forward(3);
+                    skip_line_comment("comment4");
+                    continue;
+                }
+            }
+            var ch = peek();
+            if (!ch) return token("eof");
+            var code = ch.charCodeAt(0);
+            switch (code) {
+              case 34: case 39: return read_string(ch);
+              case 46: return handle_dot();
+              case 47: {
+                  var tok = handle_slash();
+                  if (tok === next_token) continue;
+                  return tok;
+              }
+            }
+            if (is_digit(code)) return read_num();
+            if (PUNC_CHARS[ch]) return token("punc", next());
+            if (OPERATOR_CHARS[ch]) return read_operator();
+            if (code == 92 || is_identifier_start(code)) return read_word();
+            break;
+        }
+        parse_error("Unexpected character '" + ch + "'");
+    }
+
+    next_token.context = function(nc) {
+        if (nc) S = nc;
+        return S;
+    };
+
+    next_token.add_directive = function(directive) {
+        S.directive_stack[S.directive_stack.length - 1].push(directive);
+
+        if (S.directives[directive] === undefined) {
+            S.directives[directive] = 1;
+        } else {
+            S.directives[directive]++;
+        }
+    }
+
+    next_token.push_directives_stack = function() {
+        S.directive_stack.push([]);
+    }
+
+    next_token.pop_directives_stack = function() {
+        var directives = S.directive_stack[S.directive_stack.length - 1];
+
+        for (var i = 0; i < directives.length; i++) {
+            S.directives[directives[i]]--;
+        }
+
+        S.directive_stack.pop();
+    }
+
+    next_token.has_directive = function(directive) {
+        return S.directives[directive] > 0;
+    }
+
+    return next_token;
+}
+
+/* -----[ Parser (constants) ]----- */
+
+var UNARY_PREFIX = makePredicate([
+    "typeof",
+    "void",
+    "delete",
+    "--",
+    "++",
+    "!",
+    "~",
+    "-",
+    "+"
+]);
+
+var UNARY_POSTFIX = makePredicate([ "--", "++" ]);
+
+var ASSIGNMENT = makePredicate([ "=", "+=", "-=", "/=", "*=", "%=", ">>=", "<<=", ">>>=", "|=", "^=", "&=" ]);
+
+var PRECEDENCE = function(a, ret) {
+    for (var i = 0; i < a.length; ++i) {
+        var b = a[i];
+        for (var j = 0; j < b.length; ++j) {
+            ret[b[j]] = i + 1;
+        }
+    }
+    return ret;
+}([
+    ["||"],
+    ["&&"],
+    ["|"],
+    ["^"],
+    ["&"],
+    ["==", "===", "!=", "!=="],
+    ["<", ">", "<=", ">=", "in", "instanceof"],
+    [">>", "<<", ">>>"],
+    ["+", "-"],
+    ["*", "/", "%"]
+], {});
+
+var ATOMIC_START_TOKEN = makePredicate([ "atom", "num", "string", "regexp", "name" ]);
+
+/* -----[ Parser ]----- */
+
+function parse($TEXT, options) {
+    options = defaults(options, {
+        bare_returns   : false,
+        expression     : false,
+        filename       : null,
+        html5_comments : true,
+        shebang        : true,
+        strict         : false,
+        toplevel       : null,
+    }, true);
+
+    var S = {
+        input         : (typeof $TEXT == "string"
+                         ? tokenizer($TEXT, options.filename,
+                                     options.html5_comments, options.shebang)
+                         : $TEXT),
+        token         : null,
+        prev          : null,
+        peeked        : null,
+        in_function   : 0,
+        in_directives : true,
+        in_loop       : 0,
+        labels        : []
+    };
+
+    S.token = next();
+
+    function is(type, value) {
+        return is_token(S.token, type, value);
+    }
+
+    function peek() {
+        return S.peeked || (S.peeked = S.input());
+    }
+
+    function next() {
+        S.prev = S.token;
+        if (S.peeked) {
+            S.token = S.peeked;
+            S.peeked = null;
+        } else {
+            S.token = S.input();
+        }
+        S.in_directives = S.in_directives && (
+            S.token.type == "string" || is("punc", ";")
+        );
+        return S.token;
+    }
+
+    function prev() {
+        return S.prev;
+    }
+
+    function croak(msg, line, col, pos) {
+        var ctx = S.input.context();
+        js_error(msg,
+                 ctx.filename,
+                 line != null ? line : ctx.tokline,
+                 col != null ? col : ctx.tokc

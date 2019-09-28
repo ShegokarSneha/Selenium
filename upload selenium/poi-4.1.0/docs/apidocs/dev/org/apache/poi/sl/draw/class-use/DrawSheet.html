@@ -1,0 +1,269 @@
+md) for project history details, too.
+
+Happy hacking!
+
+### API
+
+#### <a name="localized-api"></a> Using localized APIs
+
+cacache includes a complete API in English, with the same features as other
+translations. To use the English API as documented in this README, use
+`require('cacache/en')`. This is also currently the default if you do
+`require('cacache')`, but may change in the future.
+
+cacache also supports other languages! You can find the list of currently
+supported ones by looking in `./locales` in the source directory. You can use
+the API in that language with `require('cacache/<lang>')`.
+
+Want to add support for a new language? Please go ahead! You should be able to
+copy `./locales/en.js` and `./locales/en.json` and fill them in. Translating the
+`README.md` is a bit more work, but also appreciated if you get around to it. 👍🏼
+
+#### <a name="ls"></a> `> cacache.ls(cache) -> Promise<Object>`
+
+Lists info for all entries currently in the cache as a single large object. Each
+entry in the object will be keyed by the unique index key, with corresponding
+[`get.info`](#get-info) objects as the values.
+
+##### Example
+
+```javascript
+cacache.ls(cachePath).then(console.log)
+// Output
+{
+  'my-thing': {
+    key: 'my-thing',
+    integrity: 'sha512-BaSe64/EnCoDED+HAsh=='
+    path: '.testcache/content/deadbeef', // joined with `cachePath`
+    time: 12345698490,
+    size: 4023948,
+    metadata: {
+      name: 'blah',
+      version: '1.2.3',
+      description: 'this was once a package but now it is my-thing'
+    }
+  },
+  'other-thing': {
+    key: 'other-thing',
+    integrity: 'sha1-ANothER+hasH=',
+    path: '.testcache/content/bada55',
+    time: 11992309289,
+    size: 111112
+  }
+}
+```
+
+#### <a name="ls-stream"></a> `> cacache.ls.stream(cache) -> Readable`
+
+Lists info for all entries currently in the cache as a single large object.
+
+This works just like [`ls`](#ls), except [`get.info`](#get-info) entries are
+returned as `'data'` events on the returned stream.
+
+##### Example
+
+```javascript
+cacache.ls.stream(cachePath).on('data', console.log)
+// Output
+{
+  key: 'my-thing',
+  integrity: 'sha512-BaSe64HaSh',
+  path: '.testcache/content/deadbeef', // joined with `cachePath`
+  time: 12345698490,
+  size: 13423,
+  metadata: {
+    name: 'blah',
+    version: '1.2.3',
+    description: 'this was once a package but now it is my-thing'
+  }
+}
+
+{
+  key: 'other-thing',
+  integrity: 'whirlpool-WoWSoMuchSupport',
+  path: '.testcache/content/bada55',
+  time: 11992309289,
+  size: 498023984029
+}
+
+{
+  ...
+}
+```
+
+#### <a name="get-data"></a> `> cacache.get(cache, key, [opts]) -> Promise({data, metadata, integrity})`
+
+Returns an object with the cached data, digest, and metadata identified by
+`key`. The `data` property of this object will be a `Buffer` instance that
+presumably holds some data that means something to you. I'm sure you know what
+to do with it! cacache just won't care.
+
+`integrity` is a [Subresource
+Integrity](#integrity)
+string. That is, a string that can be used to verify `data`, which looks like
+`<hash-algorithm>-<base64-integrity-hash>`.
+
+If there is no content identified by `key`, or if the locally-stored data does
+not pass the validity checksum, the promise will be rejected.
+
+A sub-function, `get.byDigest` may be used for identical behavior, except lookup
+will happen by integrity hash, bypassing the index entirely. This version of the
+function *only* returns `data` itself, without any wrapper.
+
+##### Note
+
+This function loads the entire cache entry into memory before returning it. If
+you're dealing with Very Large data, consider using [`get.stream`](#get-stream)
+instead.
+
+##### Example
+
+```javascript
+// Look up by key
+cache.get(cachePath, 'my-thing').then(console.log)
+// Output:
+{
+  metadata: {
+    thingName: 'my'
+  },
+  integrity: 'sha512-BaSe64HaSh',
+  data: Buffer#<deadbeef>,
+  size: 9320
+}
+
+// Look up by digest
+cache.get.byDigest(cachePath, 'sha512-BaSe64HaSh').then(console.log)
+// Output:
+Buffer#<deadbeef>
+```
+
+#### <a name="get-stream"></a> `> cacache.get.stream(cache, key, [opts]) -> Readable`
+
+Returns a [Readable Stream](https://nodejs.org/api/stream.html#stream_readable_streams) of the cached data identified by `key`.
+
+If there is no content identified by `key`, or if the locally-stored data does
+not pass the validity checksum, an error will be emitted.
+
+`metadata` and `integrity` events will be emitted before the stream closes, if
+you need to collect that extra data about the cached entry.
+
+A sub-function, `get.stream.byDigest` may be used for identical behavior,
+except lookup will happen by integrity hash, bypassing the index entirely. This
+version does not emit the `metadata` and `integrity` events at all.
+
+##### Example
+
+```javascript
+// Look up by key
+cache.get.stream(
+  cachePath, 'my-thing'
+).on('metadata', metadata => {
+  console.log('metadata:', metadata)
+}).on('integrity', integrity => {
+  console.log('integrity:', integrity)
+}).pipe(
+  fs.createWriteStream('./x.tgz')
+)
+// Outputs:
+metadata: { ... }
+integrity: 'sha512-SoMeDIGest+64=='
+
+// Look up by digest
+cache.get.stream.byDigest(
+  cachePath, 'sha512-SoMeDIGest+64=='
+).pipe(
+  fs.createWriteStream('./x.tgz')
+)
+```
+
+#### <a name="get-info"></a> `> cacache.get.info(cache, key) -> Promise`
+
+Looks up `key` in the cache index, returning information about the entry if
+one exists.
+
+##### Fields
+
+* `key` - Key the entry was looked up under. Matches the `key` argument.
+* `integrity` - [Subresource Integrity hash](#integrity) for the content this entry refers to.
+* `path` - Filesystem path relative to `cache` argument where content is stored.
+* `time` - Timestamp the entry was first added on.
+* `metadata` - User-assigned metadata associated with the entry/content.
+
+##### Example
+
+```javascript
+cacache.get.info(cachePath, 'my-thing').then(console.log)
+
+// Output
+{
+  key: 'my-thing',
+  integrity: 'sha256-MUSTVERIFY+ALL/THINGS=='
+  path: '.testcache/content/deadbeef',
+  time: 12345698490,
+  size: 849234,
+  metadata: {
+    name: 'blah',
+    version: '1.2.3',
+    description: 'this was once a package but now it is my-thing'
+  }
+}
+```
+
+#### <a name="get-hasContent"></a> `> cacache.get.hasContent(cache, integrity) -> Promise`
+
+Looks up a [Subresource Integrity hash](#integrity) in the cache. If content
+exists for this `integrity`, it will return an object, with the specific single integrity hash
+that was found in `sri` key, and the size of the found content as `size`. If no content exists for this integrity, it will return `false`.
+
+##### Example
+
+```javascript
+cacache.get.hasContent(cachePath, 'sha256-MUSTVERIFY+ALL/THINGS==').then(console.log)
+
+// Output
+{
+  sri: {
+    source: 'sha256-MUSTVERIFY+ALL/THINGS==',
+    algorithm: 'sha256',
+    digest: 'MUSTVERIFY+ALL/THINGS==',
+    options: []
+  },
+  size: 9001
+}
+
+cacache.get.hasContent(cachePath, 'sha521-NOT+IN/CACHE==').then(console.log)
+
+// Output
+false
+```
+
+#### <a name="put-data"></a> `> cacache.put(cache, key, data, [opts]) -> Promise`
+
+Inserts data passed to it into the cache. The returned Promise resolves with a
+digest (generated according to [`opts.algorithms`](#optsalgorithms)) after the
+cache entry has been successfully written.
+
+##### Example
+
+```javascript
+fetch(
+  'https://registry.npmjs.org/cacache/-/cacache-1.0.0.tgz'
+).then(data => {
+  return cacache.put(cachePath, 'registry.npmjs.org|cacache@1.0.0', data)
+}).then(integrity => {
+  console.log('integrity hash is', integrity)
+})
+```
+
+#### <a name="put-stream"></a> `> cacache.put.stream(cache, key, [opts]) -> Writable`
+
+Returns a [Writable
+Stream](https://nodejs.org/api/stream.html#stream_writable_streams) that inserts
+data written to it into the cache. Emits an `integrity` event with the digest of
+written contents when it succeeds.
+
+##### Example
+
+```javascript
+request.get(
+  'https://registry.npmjs.org/cacache/-/cacache-1.0.0.

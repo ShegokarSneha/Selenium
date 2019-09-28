@@ -1,0 +1,170 @@
+efaults to none.
+ *
+ * @return the base64-encoded output string.
+ */
+util.binary.base64.encode = function(input, maxline) {
+  var line = '';
+  var output = '';
+  var chr1, chr2, chr3;
+  var i = 0;
+  while(i < input.byteLength) {
+    chr1 = input[i++];
+    chr2 = input[i++];
+    chr3 = input[i++];
+
+    // encode 4 character group
+    line += _base64.charAt(chr1 >> 2);
+    line += _base64.charAt(((chr1 & 3) << 4) | (chr2 >> 4));
+    if(isNaN(chr2)) {
+      line += '==';
+    } else {
+      line += _base64.charAt(((chr2 & 15) << 2) | (chr3 >> 6));
+      line += isNaN(chr3) ? '=' : _base64.charAt(chr3 & 63);
+    }
+
+    if(maxline && line.length > maxline) {
+      output += line.substr(0, maxline) + '\r\n';
+      line = line.substr(maxline);
+    }
+  }
+  output += line;
+  return output;
+};
+
+/**
+ * Decodes a base64-encoded string to a Uint8Array.
+ *
+ * @param input the base64-encoded input string.
+ * @param [output] an optional Uint8Array to write the output to; if it
+ *          is too small, an exception will be thrown.
+ * @param [offset] the start offset for writing to the output (default: 0).
+ *
+ * @return the Uint8Array or the number of bytes written if output was given.
+ */
+util.binary.base64.decode = function(input, output, offset) {
+  var out = output;
+  if(!out) {
+    out = new Uint8Array(Math.ceil(input.length / 4) * 3);
+  }
+
+  // remove all non-base64 characters
+  input = input.replace(/[^A-Za-z0-9\+\/\=]/g, '');
+
+  offset = offset || 0;
+  var enc1, enc2, enc3, enc4;
+  var i = 0, j = offset;
+
+  while(i < input.length) {
+    enc1 = _base64Idx[input.charCodeAt(i++) - 43];
+    enc2 = _base64Idx[input.charCodeAt(i++) - 43];
+    enc3 = _base64Idx[input.charCodeAt(i++) - 43];
+    enc4 = _base64Idx[input.charCodeAt(i++) - 43];
+
+    out[j++] = (enc1 << 2) | (enc2 >> 4);
+    if(enc3 !== 64) {
+      // decoded at least 2 bytes
+      out[j++] = ((enc2 & 15) << 4) | (enc3 >> 2);
+      if(enc4 !== 64) {
+        // decoded 3 bytes
+        out[j++] = ((enc3 & 3) << 6) | enc4;
+      }
+    }
+  }
+
+  // make sure result is the exact decoded length
+  return output ? (j - offset) : out.subarray(0, j);
+};
+
+// add support for base58 encoding/decoding with Bitcoin alphabet
+util.binary.base58.encode = function(input, maxline) {
+  return util.binary.baseN.encode(input, _base58, maxline);
+};
+util.binary.base58.decode = function(input, maxline) {
+  return util.binary.baseN.decode(input, _base58, maxline);
+};
+
+// text encoding/decoding tools
+// FIXME: Experimental. Do not use yet.
+util.text = {
+  utf8: {},
+  utf16: {}
+};
+
+/**
+ * Encodes the given string as UTF-8 in a Uint8Array.
+ *
+ * @param str the string to encode.
+ * @param [output] an optional Uint8Array to write the output to; if it
+ *          is too small, an exception will be thrown.
+ * @param [offset] the start offset for writing to the output (default: 0).
+ *
+ * @return the Uint8Array or the number of bytes written if output was given.
+ */
+util.text.utf8.encode = function(str, output, offset) {
+  str = util.encodeUtf8(str);
+  var out = output;
+  if(!out) {
+    out = new Uint8Array(str.length);
+  }
+  offset = offset || 0;
+  var j = offset;
+  for(var i = 0; i < str.length; ++i) {
+    out[j++] = str.charCodeAt(i);
+  }
+  return output ? (j - offset) : out;
+};
+
+/**
+ * Decodes the UTF-8 contents from a Uint8Array.
+ *
+ * @param bytes the Uint8Array to decode.
+ *
+ * @return the resulting string.
+ */
+util.text.utf8.decode = function(bytes) {
+  return util.decodeUtf8(String.fromCharCode.apply(null, bytes));
+};
+
+/**
+ * Encodes the given string as UTF-16 in a Uint8Array.
+ *
+ * @param str the string to encode.
+ * @param [output] an optional Uint8Array to write the output to; if it
+ *          is too small, an exception will be thrown.
+ * @param [offset] the start offset for writing to the output (default: 0).
+ *
+ * @return the Uint8Array or the number of bytes written if output was given.
+ */
+util.text.utf16.encode = function(str, output, offset) {
+  var out = output;
+  if(!out) {
+    out = new Uint8Array(str.length * 2);
+  }
+  var view = new Uint16Array(out.buffer);
+  offset = offset || 0;
+  var j = offset;
+  var k = offset;
+  for(var i = 0; i < str.length; ++i) {
+    view[k++] = str.charCodeAt(i);
+    j += 2;
+  }
+  return output ? (j - offset) : out;
+};
+
+/**
+ * Decodes the UTF-16 contents from a Uint8Array.
+ *
+ * @param bytes the Uint8Array to decode.
+ *
+ * @return the resulting string.
+ */
+util.text.utf16.decode = function(bytes) {
+  return String.fromCharCode.apply(null, new Uint16Array(bytes.buffer));
+};
+
+/**
+ * Deflates the given data using a flash interface.
+ *
+ * @param api the flash interface.
+ * @param bytes the data.
+ * @param raw true to 

@@ -1,0 +1,269 @@
+u1083\\u1084\\u1087-\\u108C\\u108F\\u109A-\\u109C\\u17B6\\u17BE-\\u17C5\\u17C7\\u17C8\\u1923-\\u1926\\u1929-\\u192B\\u1930\\u1931\\u1933-\\u1938\\u19B0-\\u19C0\\u19C8\\u19C9\\u1A19-\\u1A1B\\u1A55\\u1A57\\u1A61\\u1A63\\u1A64\\u1A6D-\\u1A72\\u1B04\\u1B35\\u1B3B\\u1B3D-\\u1B41\\u1B43\\u1B44\\u1B82\\u1BA1\\u1BA6\\u1BA7\\u1BAA\\u1C24-\\u1C2B\\u1C34\\u1C35\\u1CE1\\u1CF2\\uA823\\uA824\\uA827\\uA880\\uA881\\uA8B4-\\uA8C3\\uA952\\uA953\\uA983\\uA9B4\\uA9B5\\uA9BA\\uA9BB\\uA9BD-\\uA9C0\\uAA2F\\uAA30\\uAA33\\uAA34\\uAA4D\\uAA7B\\uABE3\\uABE4\\uABE6\\uABE7\\uABE9\\uABEA\\uABEC]"),
+    connector_punctuation: new RegExp("[\\u005F\\u203F\\u2040\\u2054\\uFE33\\uFE34\\uFE4D-\\uFE4F\\uFF3F]")
+};
+
+function is_letter(code) {
+    return (code >= 97 && code <= 122)
+        || (code >= 65 && code <= 90)
+        || (code >= 0xaa && UNICODE.letter.test(String.fromCharCode(code)));
+}
+
+function is_surrogate_pair_head(code) {
+    if (typeof code == "string")
+        code = code.charCodeAt(0);
+    return code >= 0xd800 && code <= 0xdbff;
+}
+
+function is_surrogate_pair_tail(code) {
+    if (typeof code == "string")
+        code = code.charCodeAt(0);
+    return code >= 0xdc00 && code <= 0xdfff;
+}
+
+function is_digit(code) {
+    return code >= 48 && code <= 57;
+}
+
+function is_alphanumeric_char(code) {
+    return is_digit(code) || is_letter(code);
+}
+
+function is_unicode_digit(code) {
+    return UNICODE.digit.test(String.fromCharCode(code));
+}
+
+function is_unicode_combining_mark(ch) {
+    return UNICODE.non_spacing_mark.test(ch) || UNICODE.space_combining_mark.test(ch);
+}
+
+function is_unicode_connector_punctuation(ch) {
+    return UNICODE.connector_punctuation.test(ch);
+}
+
+function is_identifier(name) {
+    return !RESERVED_WORDS[name] && /^[a-z_$][a-z0-9_$]*$/i.test(name);
+}
+
+function is_identifier_start(code) {
+    return code == 36 || code == 95 || is_letter(code);
+}
+
+function is_identifier_char(ch) {
+    var code = ch.charCodeAt(0);
+    return is_identifier_start(code)
+        || is_digit(code)
+        || code == 8204 // \u200c: zero-width non-joiner <ZWNJ>
+        || code == 8205 // \u200d: zero-width joiner <ZWJ> (in my ECMA-262 PDF, this is also 200c)
+        || is_unicode_combining_mark(ch)
+        || is_unicode_connector_punctuation(ch)
+        || is_unicode_digit(code)
+    ;
+}
+
+function is_identifier_string(str) {
+    return /^[a-z_$][a-z0-9_$]*$/i.test(str);
+}
+
+function parse_js_number(num) {
+    if (RE_HEX_NUMBER.test(num)) {
+        return parseInt(num.substr(2), 16);
+    } else if (RE_OCT_NUMBER.test(num)) {
+        return parseInt(num.substr(1), 8);
+    } else {
+        var val = parseFloat(num);
+        if (val == num) return val;
+    }
+}
+
+function JS_Parse_Error(message, filename, line, col, pos) {
+    this.message = message;
+    this.filename = filename;
+    this.line = line;
+    this.col = col;
+    this.pos = pos;
+}
+JS_Parse_Error.prototype = Object.create(Error.prototype);
+JS_Parse_Error.prototype.constructor = JS_Parse_Error;
+JS_Parse_Error.prototype.name = "SyntaxError";
+configure_error_stack(JS_Parse_Error);
+
+function js_error(message, filename, line, col, pos) {
+    throw new JS_Parse_Error(message, filename, line, col, pos);
+}
+
+function is_token(token, type, val) {
+    return token.type == type && (val == null || token.value == val);
+}
+
+var EX_EOF = {};
+
+function tokenizer($TEXT, filename, html5_comments, shebang) {
+
+    var S = {
+        text            : $TEXT,
+        filename        : filename,
+        pos             : 0,
+        tokpos          : 0,
+        line            : 1,
+        tokline         : 0,
+        col             : 0,
+        tokcol          : 0,
+        newline_before  : false,
+        regex_allowed   : false,
+        comments_before : [],
+        directives      : {},
+        directive_stack : []
+    };
+
+    function peek() {
+        return S.text.charAt(S.pos);
+    }
+
+    function next(signal_eof, in_string) {
+        var ch = S.text.charAt(S.pos++);
+        if (signal_eof && !ch)
+            throw EX_EOF;
+        if (NEWLINE_CHARS[ch]) {
+            S.newline_before = S.newline_before || !in_string;
+            ++S.line;
+            S.col = 0;
+            if (!in_string && ch == "\r" && peek() == "\n") {
+                // treat a \r\n sequence as a single \n
+                ++S.pos;
+                ch = "\n";
+            }
+        } else {
+            ++S.col;
+        }
+        return ch;
+    }
+
+    function forward(i) {
+        while (i-- > 0) next();
+    }
+
+    function looking_at(str) {
+        return S.text.substr(S.pos, str.length) == str;
+    }
+
+    function find_eol() {
+        var text = S.text;
+        for (var i = S.pos, n = S.text.length; i < n; ++i) {
+            var ch = text[i];
+            if (NEWLINE_CHARS[ch])
+                return i;
+        }
+        return -1;
+    }
+
+    function find(what, signal_eof) {
+        var pos = S.text.indexOf(what, S.pos);
+        if (signal_eof && pos == -1) throw EX_EOF;
+        return pos;
+    }
+
+    function start_token() {
+        S.tokline = S.line;
+        S.tokcol = S.col;
+        S.tokpos = S.pos;
+    }
+
+    var prev_was_dot = false;
+    function token(type, value, is_comment) {
+        S.regex_allowed = ((type == "operator" && !UNARY_POSTFIX[value]) ||
+                           (type == "keyword" && KEYWORDS_BEFORE_EXPRESSION[value]) ||
+                           (type == "punc" && PUNC_BEFORE_EXPRESSION[value]));
+        if (type == "punc" && value == ".") {
+            prev_was_dot = true;
+        } else if (!is_comment) {
+            prev_was_dot = false;
+        }
+        var ret = {
+            type    : type,
+            value   : value,
+            line    : S.tokline,
+            col     : S.tokcol,
+            pos     : S.tokpos,
+            endline : S.line,
+            endcol  : S.col,
+            endpos  : S.pos,
+            nlb     : S.newline_before,
+            file    : filename
+        };
+        if (/^(?:num|string|regexp)$/i.test(type)) {
+            ret.raw = $TEXT.substring(ret.pos, ret.endpos);
+        }
+        if (!is_comment) {
+            ret.comments_before = S.comments_before;
+            ret.comments_after = S.comments_before = [];
+        }
+        S.newline_before = false;
+        return new AST_Token(ret);
+    }
+
+    function skip_whitespace() {
+        while (WHITESPACE_CHARS[peek()])
+            next();
+    }
+
+    function read_while(pred) {
+        var ret = "", ch, i = 0;
+        while ((ch = peek()) && pred(ch, i++))
+            ret += next();
+        return ret;
+    }
+
+    function parse_error(err) {
+        js_error(err, filename, S.tokline, S.tokcol, S.tokpos);
+    }
+
+    function read_num(prefix) {
+        var has_e = false, after_e = false, has_x = false, has_dot = prefix == ".";
+        var num = read_while(function(ch, i) {
+            var code = ch.charCodeAt(0);
+            switch (code) {
+              case 120: case 88: // xX
+                return has_x ? false : (has_x = true);
+              case 101: case 69: // eE
+                return has_x ? true : has_e ? false : (has_e = after_e = true);
+              case 45: // -
+                return after_e || (i == 0 && !prefix);
+              case 43: // +
+                return after_e;
+              case (after_e = false, 46): // .
+                return (!has_dot && !has_x && !has_e) ? (has_dot = true) : false;
+            }
+            return is_alphanumeric_char(code);
+        });
+        if (prefix) num = prefix + num;
+        if (RE_OCT_NUMBER.test(num) && next_token.has_directive("use strict")) {
+            parse_error("Legacy octal literals are not allowed in strict mode");
+        }
+        var valid = parse_js_number(num);
+        if (!isNaN(valid)) {
+            return token("num", valid);
+        } else {
+            parse_error("Invalid syntax: " + num);
+        }
+    }
+
+    function read_escaped_char(in_string) {
+        var ch = next(true, in_string);
+        switch (ch.charCodeAt(0)) {
+          case 110 : return "\n";
+          case 114 : return "\r";
+          case 116 : return "\t";
+          case 98  : return "\b";
+          case 118 : return "\u000b"; // \v
+          case 102 : return "\f";
+          case 120 : return String.fromCharCode(hex_bytes(2)); // \x
+          case 117 : return String.fromCharCode(hex_bytes(4)); // \u
+          case 10  : return ""; // newline
+          case 13  :            // \r
+            if (peek() == "\n") { // DOS newline
+                next(true, in_string);
+                return "";
+            }
+        }
+        if (ch >= "0" && ch <= "7")
+            return r

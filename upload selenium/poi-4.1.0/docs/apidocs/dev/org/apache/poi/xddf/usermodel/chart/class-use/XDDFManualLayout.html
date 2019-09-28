@@ -1,0 +1,262 @@
+:`.Session.is_active`
+
+        :meth:`.SessionEvents.after_transaction_create`
+
+        :meth:`.SessionEvents.after_transaction_end`
+
+        :meth:`.SessionEvents.after_commit`
+
+        :meth:`.SessionEvents.after_rollback`
+
+        :meth:`.SessionEvents.after_soft_rollback`
+
+    """
+
+    _rollback_exception = None
+
+    def __init__(self, session, parent=None, nested=False):
+        self.session = session
+        self._connections = {}
+        self._parent = parent
+        self.nested = nested
+        self._state = ACTIVE
+        if not parent and nested:
+            raise sa_exc.InvalidRequestError(
+                "Can't start a SAVEPOINT transaction when no existing "
+                "transaction is in progress"
+            )
+
+        if self.session._enable_transaction_accounting:
+            self._take_snapshot()
+
+        self.session.dispatch.after_transaction_create(self.session, self)
+
+    @property
+    def parent(self):
+        """The parent :class:`.SessionTransaction` of this
+        :class:`.SessionTransaction`.
+
+        If this attribute is ``None``, indicates this
+        :class:`.SessionTransaction` is at the top of the stack, and
+        corresponds to a real "COMMIT"/"ROLLBACK"
+        block.  If non-``None``, then this is either a "subtransaction"
+        or a "nested" / SAVEPOINT transaction.  If the
+        :attr:`.SessionTransaction.nested` attribute is ``True``, then
+        this is a SAVEPOINT, and if ``False``, indicates this a subtransaction.
+
+        .. versionadded:: 1.0.16 - use ._parent for previous versions
+
+        """
+        return self._parent
+
+    nested = False
+    """Indicates if this is a nested, or SAVEPOINT, transaction.
+
+    When :attr:`.SessionTransaction.nested` is True, it is expected
+    that :attr:`.SessionTransaction.parent` will be True as well.
+
+    """
+
+    @property
+    def is_active(self):
+        return self.session is not None and self._state is ACTIVE
+
+    def _assert_active(
+        self,
+        prepared_ok=False,
+        rollback_ok=False,
+        deactive_ok=False,
+        closed_msg="This transaction is closed",
+    ):
+        if self._state is COMMITTED:
+            raise sa_exc.InvalidRequestError(
+                "This session is in 'committed' state; no further "
+                "SQL can be emitted within this transaction."
+            )
+        elif self._state is PREPARED:
+            if not prepared_ok:
+                raise sa_exc.InvalidRequestError(
+                    "This session is in 'prepared' state; no further "
+                    "SQL can be emitted within this transaction."
+                )
+        elif self._state is DEACTIVE:
+            if not deactive_ok and not rollback_ok:
+                if self._rollback_exception:
+                    raise sa_exc.InvalidRequestError(
+                        "This Session's transaction has been rolled back "
+                        "due to a previous exception during flush."
+                        " To begin a new transaction with this Session, "
+                        "first issue Session.rollback()."
+                        " Original exception was: %s"
+                        % self._rollback_exception
+                    )
+                elif not deactive_ok:
+                    raise sa_exc.InvalidRequestError(
+                        "This session is in 'inactive' state, due to the "
+                        "SQL transaction being rolled back; no further "
+                        "SQL can be emitted within this transaction."
+                    )
+        elif self._state is CLOSED:
+            raise sa_exc.ResourceClosedError(closed_msg)
+
+    @property
+    def _is_transaction_boundary(self):
+        return self.nested or not self._parent
+
+    def connection(self, bindkey, execution_options=None, **kwargs):
+        self._assert_active()
+        bind = self.session.get_bind(bindkey, **kwargs)
+        return self._connection_for_bind(bind, execution_options)
+
+    def _begin(self, nested=False):
+        self._assert_active()
+        return SessionTransaction(self.session, self, nested=nested)
+
+    def _iterate_self_and_parents(self, upto=None):
+
+        current = self
+        result = ()
+        while current:
+            result += (current,)
+            if current._parent is upto:
+                break
+            elif current._parent is None:
+                raise sa_exc.InvalidRequestError(
+                    "Transaction %s is not on the active transaction list"
+                    % (upto)
+                )
+            else:
+                current = current._parent
+
+        return result
+
+    def _take_snapshot(self):
+        if not self._is_transaction_boundary:
+            self._new = self._parent._new
+            self._deleted = self._parent._deleted
+            self._dirty = self._parent._dirty
+            self._key_switches = self._parent._key_switches
+            return
+
+        if not self.session._flushing:
+            self.session.flush()
+
+        self._new = weakref.WeakKeyDictionary()
+        self._deleted = weakref.WeakKeyDictionary()
+        self._dirty = weakref.WeakKeyDictionary()
+        self._key_switches = weakref.WeakKeyDictionary()
+
+    def _restore_snapshot(self, dirty_only=False):
+        """Restore the restoration state taken before a transaction began.
+
+        Corresponds to a rollback.
+
+        """
+        assert self._is_transaction_boundary
+
+        to_expunge = set(self._new).union(self.session._new)
+        self.session._expunge_states(to_expunge, to_transient=True)
+
+        for s, (oldkey, newkey) in self._key_switches.items():
+            # we probably can do this conditionally based on
+            # if we expunged or not, but safe_discard does that anyway
+            self.session.identity_map.safe_discard(s)
+
+            # restore the old key
+            s.key = oldkey
+
+            # now restore the object, but only if we didn't expunge
+            if s not in to_expunge:
+                self.session.identity_map.replace(s)
+
+        for s in set(self._deleted).union(self.session._deleted):
+            self.session._update_impl(s, revert_deletion=True)
+
+        assert not self.session._deleted
+
+        for s in self.session.identity_map.all_states():
+            if not dirty_only or s.modified or s in self._dirty:
+                s._expire(s.dict, self.session.identity_map._modified)
+
+    def _remove_snapshot(self):
+        """Remove the restoration state taken before a transaction began.
+
+        Corresponds to a commit.
+
+        """
+        assert self._is_transaction_boundary
+
+        if not self.nested and self.session.expire_on_commit:
+            for s in self.session.identity_map.all_states():
+                s._expire(s.dict, self.session.identity_map._modified)
+
+            statelib.InstanceState._detach_states(
+                list(self._deleted), self.session
+            )
+            self._deleted.clear()
+        elif self.nested:
+            self._parent._new.update(self._new)
+            self._parent._dirty.update(self._dirty)
+            self._parent._deleted.update(self._deleted)
+            self._parent._key_switches.update(self._key_switches)
+
+    def _connection_for_bind(self, bind, execution_options):
+        self._assert_active()
+
+        if bind in self._connections:
+            if execution_options:
+                util.warn(
+                    "Connection is already established for the "
+                    "given bind; execution_options ignored"
+                )
+            return self._connections[bind][0]
+
+        if self._parent:
+            conn = self._parent._connection_for_bind(bind, execution_options)
+            if not self.nested:
+                return conn
+        else:
+            if isinstance(bind, engine.Connection):
+                conn = bind
+                if conn.engine in self._connections:
+                    raise sa_exc.InvalidRequestError(
+                        "Session already has a Connection associated for the "
+                        "given Connection's Engine"
+                    )
+            else:
+                conn = bind._contextual_connect()
+
+        if execution_options:
+            conn = conn.execution_options(**execution_options)
+
+        if self.session.twophase and self._parent is None:
+            transaction = conn.begin_twophase()
+        elif self.nested:
+            transaction = conn.begin_nested()
+        else:
+            transaction = conn.begin()
+
+        self._connections[conn] = self._connections[conn.engine] = (
+            conn,
+            transaction,
+            conn is not bind,
+        )
+        self.session.dispatch.after_begin(self.session, self, conn)
+        return conn
+
+    def prepare(self):
+        if self._parent is not None or not self.session.twophase:
+            raise sa_exc.InvalidRequestError(
+                "'twophase' mode not enabled, or not root transaction; "
+                "can't prepare."
+            )
+        self._prepare_impl()
+
+    def _prepare_impl(self):
+        self._assert_active()
+        if self._parent is None or self.nested:
+            self.session.dispatch.before_commit(self.session)
+
+        stx = self.session.transaction
+        if stx is not self:
+            for su

@@ -1,0 +1,620 @@
+) {
+            var pipeMetadata = _this._metadataResolver.getPipeMetadata(pipeType);
+            if (pipeMetadata) {
+                compilePipeFromRender2(context, pipeMetadata, _this.reflector);
+            }
+        });
+        injectables.forEach(function (injectable) { return _this._injectableCompiler.compile(injectable, context); });
+    };
+    AotCompiler.prototype.emitAllPartialModules2 = function (files) {
+        var _this = this;
+        // Using reduce like this is a select many pattern (where map is a select pattern)
+        return files.reduce(function (r, file) {
+            r.push.apply(r, __spread(_this._emitPartialModule2(file.fileName, file.injectables)));
+            return r;
+        }, []);
+    };
+    AotCompiler.prototype._emitPartialModule2 = function (fileName, injectables) {
+        var _this = this;
+        var context = this._createOutputContext(fileName);
+        injectables.forEach(function (injectable) { return _this._injectableCompiler.compile(injectable, context); });
+        if (context.statements && context.statements.length > 0) {
+            return [{ fileName: fileName, statements: __spread(context.constantPool.statements, context.statements) }];
+        }
+        return [];
+    };
+    AotCompiler.prototype.emitAllImpls = function (analyzeResult) {
+        var _this = this;
+        var ngModuleByPipeOrDirective = analyzeResult.ngModuleByPipeOrDirective, files = analyzeResult.files;
+        var sourceModules = files.map(function (file) { return _this._compileImplFile(file.fileName, ngModuleByPipeOrDirective, file.directives, file.pipes, file.ngModules, file.injectables); });
+        return flatten(sourceModules);
+    };
+    AotCompiler.prototype._compileImplFile = function (srcFileUrl, ngModuleByPipeOrDirective, directives, pipes, ngModules, injectables) {
+        var _this = this;
+        var fileSuffix = normalizeGenFileSuffix(splitTypescriptSuffix(srcFileUrl, true)[1]);
+        var generatedFiles = [];
+        var outputCtx = this._createOutputContext(ngfactoryFilePath(srcFileUrl, true));
+        generatedFiles.push.apply(generatedFiles, __spread(this._createSummary(srcFileUrl, directives, pipes, ngModules, injectables, outputCtx)));
+        // compile all ng modules
+        ngModules.forEach(function (ngModuleMeta) { return _this._compileModule(outputCtx, ngModuleMeta); });
+        // compile components
+        directives.forEach(function (dirType) {
+            var compMeta = _this._metadataResolver.getDirectiveMetadata(dirType);
+            if (!compMeta.isComponent) {
+                return;
+            }
+            var ngModule = ngModuleByPipeOrDirective.get(dirType);
+            if (!ngModule) {
+                throw new Error("Internal Error: cannot determine the module for component " + identifierName(compMeta.type) + "!");
+            }
+            // compile styles
+            var componentStylesheet = _this._styleCompiler.compileComponent(outputCtx, compMeta);
+            // Note: compMeta is a component and therefore template is non null.
+            compMeta.template.externalStylesheets.forEach(function (stylesheetMeta) {
+                // Note: fill non shim and shim style files as they might
+                // be shared by component with and without ViewEncapsulation.
+                var shim = _this._styleCompiler.needsStyleShim(compMeta);
+                generatedFiles.push(_this._codegenStyles(srcFileUrl, compMeta, stylesheetMeta, shim, fileSuffix));
+                if (_this._options.allowEmptyCodegenFiles) {
+                    generatedFiles.push(_this._codegenStyles(srcFileUrl, compMeta, stylesheetMeta, !shim, fileSuffix));
+                }
+            });
+            // compile components
+            var compViewVars = _this._compileComponent(outputCtx, compMeta, ngModule, ngModule.transitiveModule.directives, componentStylesheet, fileSuffix);
+            _this._compileComponentFactory(outputCtx, compMeta, ngModule, fileSuffix);
+        });
+        if (outputCtx.statements.length > 0 || this._options.allowEmptyCodegenFiles) {
+            var srcModule = this._codegenSourceModule(srcFileUrl, outputCtx);
+            generatedFiles.unshift(srcModule);
+        }
+        return generatedFiles;
+    };
+    AotCompiler.prototype._createSummary = function (srcFileName, directives, pipes, ngModules, injectables, ngFactoryCtx) {
+        var _this = this;
+        var symbolSummaries = this._symbolResolver.getSymbolsOf(srcFileName)
+            .map(function (symbol) { return _this._symbolResolver.resolveSymbol(symbol); });
+        var typeData = __spread(ngModules.map(function (meta) { return ({
+            summary: _this._metadataResolver.getNgModuleSummary(meta.type.reference),
+            metadata: _this._metadataResolver.getNgModuleMetadata(meta.type.reference)
+        }); }), directives.map(function (ref) { return ({
+            summary: _this._metadataResolver.getDirectiveSummary(ref),
+            metadata: _this._metadataResolver.getDirectiveMetadata(ref)
+        }); }), pipes.map(function (ref) { return ({
+            summary: _this._metadataResolver.getPipeSummary(ref),
+            metadata: _this._metadataResolver.getPipeMetadata(ref)
+        }); }), injectables.map(function (ref) { return ({
+            summary: _this._metadataResolver.getInjectableSummary(ref.symbol),
+            metadata: _this._metadataResolver.getInjectableSummary(ref.symbol).type
+        }); }));
+        var forJitOutputCtx = this._options.enableSummariesForJit ?
+            this._createOutputContext(summaryForJitFileName(srcFileName, true)) :
+            null;
+        var _a = serializeSummaries(srcFileName, forJitOutputCtx, this._summaryResolver, this._symbolResolver, symbolSummaries, typeData, this._options.createExternalSymbolFactoryReexports), json = _a.json, exportAs = _a.exportAs;
+        exportAs.forEach(function (entry) {
+            ngFactoryCtx.statements.push(variable(entry.exportAs).set(ngFactoryCtx.importExpr(entry.symbol)).toDeclStmt(null, [
+                StmtModifier.Exported
+            ]));
+        });
+        var summaryJson = new GeneratedFile(srcFileName, summaryFileName(srcFileName), json);
+        var result = [summaryJson];
+        if (forJitOutputCtx) {
+            result.push(this._codegenSourceModule(srcFileName, forJitOutputCtx));
+        }
+        return result;
+    };
+    AotCompiler.prototype._compileModule = function (outputCtx, ngModule) {
+        var providers = [];
+        if (this._options.locale) {
+            var normalizedLocale = this._options.locale.replace(/_/g, '-');
+            providers.push({
+                token: createTokenForExternalReference(this.reflector, Identifiers.LOCALE_ID),
+                useValue: normalizedLocale,
+            });
+        }
+        if (this._options.i18nFormat) {
+            providers.push({
+                token: createTokenForExternalReference(this.reflector, Identifiers.TRANSLATIONS_FORMAT),
+                useValue: this._options.i18nFormat
+            });
+        }
+        this._ngModuleCompiler.compile(outputCtx, ngModule, providers);
+    };
+    AotCompiler.prototype._compileComponentFactory = function (outputCtx, compMeta, ngModule, fileSuffix) {
+        var hostMeta = this._metadataResolver.getHostComponentMetadata(compMeta);
+        var hostViewFactoryVar = this._compileComponent(outputCtx, hostMeta, ngModule, [compMeta.type], null, fileSuffix)
+            .viewClassVar;
+        var compFactoryVar = componentFactoryName(compMeta.type.reference);
+        var inputsExprs = [];
+        for (var propName in compMeta.inputs) {
+            var templateName = compMeta.inputs[propName];
+            // Don't quote so that the key gets minified...
+            inputsExprs.push(new LiteralMapEntry(propName, literal(templateName), false));
+        }
+        var outputsExprs = [];
+        for (var propName in compMeta.outputs) {
+            var templateName = compMeta.outputs[propName];
+            // Don't quote so that the key gets minified...
+            outputsExprs.push(new LiteralMapEntry(propName, literal(templateName), false));
+        }
+        outputCtx.statements.push(variable(compFactoryVar)
+            .set(importExpr(Identifiers.createComponentFactory).callFn([
+            literal(compMeta.selector), outputCtx.importExpr(compMeta.type.reference),
+            variable(hostViewFactoryVar), new LiteralMapExpr(inputsExprs),
+            new LiteralMapExpr(outputsExprs),
+            literalArr(compMeta.template.ngContentSelectors.map(function (selector) { return literal(selector); }))
+        ]))
+            .toDeclStmt(importType(Identifiers.ComponentFactory, [expressionType(outputCtx.importExpr(compMeta.type.reference))], [TypeModifier.Const]), [StmtModifier.Final, StmtModifier.Exported]));
+    };
+    AotCompiler.prototype._compileComponent = function (outputCtx, compMeta, ngModule, directiveIdentifiers, componentStyles, fileSuffix) {
+        var _a = this._parseTemplate(compMeta, ngModule, directiveIdentifiers), parsedTemplate = _a.template, usedPipes = _a.pipes;
+        var stylesExpr = componentStyles ? variable(componentStyles.stylesVar) : literalArr([]);
+        var viewResult = this._viewCompiler.compileComponent(outputCtx, compMeta, parsedTemplate, stylesExpr, usedPipes);
+        if (componentStyles) {
+            _resolveStyleStatements(this._symbolResolver, componentStyles, this._styleCompiler.needsStyleShim(compMeta), fileSuffix);
+        }
+        return viewResult;
+    };
+    AotCompiler.prototype._parseTemplate = function (compMeta, ngModule, directiveIdentifiers) {
+        var _this = this;
+        if (this._templateAstCache.has(compMeta.type.reference)) {
+            return this._templateAstCache.get(compMeta.type.reference);
+        }
+        var preserveWhitespaces = compMeta.template.preserveWhitespaces;
+        var directives = directiveIdentifiers.map(function (dir) { return _this._metadataResolver.getDirectiveSummary(dir.reference); });
+        var pipes = ngModule.transitiveModule.pipes.map(function (pipe) { return _this._metadataResolver.getPipeSummary(pipe.reference); });
+        var result = this._templateParser.parse(compMeta, compMeta.template.htmlAst, directives, pipes, ngModule.schemas, templateSourceUrl(ngModule.type, compMeta, compMeta.template), preserveWhitespaces);
+        this._templateAstCache.set(compMeta.type.reference, result);
+        return result;
+    };
+    AotCompiler.prototype._createOutputContext = function (genFilePath) {
+        var _this = this;
+        var importExpr$$1 = function (symbol, typeParams, useSummaries) {
+            if (typeParams === void 0) { typeParams = null; }
+            if (useSummaries === void 0) { useSummaries = true; }
+            if (!(symbol instanceof StaticSymbol)) {
+                throw new Error("Internal error: unknown identifier " + JSON.stringify(symbol));
+            }
+            var arity = _this._symbolResolver.getTypeArity(symbol) || 0;
+            var _a = _this._symbolResolver.getImportAs(symbol, useSummaries) || symbol, filePath = _a.filePath, name = _a.name, members = _a.members;
+            var importModule = _this._fileNameToModuleName(filePath, genFilePath);
+            // It should be good enough to compare filePath to genFilePath and if they are equal
+            // there is a self reference. However, ngfactory files generate to .ts but their
+            // symbols have .d.ts so a simple compare is insufficient. They should be canonical
+            // and is tracked by #17705.
+            var selfReference = _this._fileNameToModuleName(genFilePath, genFilePath);
+            var moduleName = importModule === selfReference ? null : importModule;
+            // If we are in a type expression that refers to a generic type then supply
+            // the required type parameters. If there were not enough type parameters
+            // supplied, supply any as the type. Outside a type expression the reference
+            // should not supply type parameters and be treated as a simple value reference
+            // to the constructor function itself.
+            var suppliedTypeParams = typeParams || [];
+            var missingTypeParamsCount = arity - suppliedTypeParams.length;
+            var allTypeParams = suppliedTypeParams.concat(new Array(missingTypeParamsCount).fill(DYNAMIC_TYPE));
+            return members.reduce(function (expr, memberName) { return expr.prop(memberName); }, importExpr(new ExternalReference(moduleName, name, null), allTypeParams));
+        };
+        return { statements: [], genFilePath: genFilePath, importExpr: importExpr$$1, constantPool: new ConstantPool() };
+    };
+    AotCompiler.prototype._fileNameToModuleName = function (importedFilePath, containingFilePath) {
+        return this._summaryResolver.getKnownModuleName(importedFilePath) ||
+            this._symbolResolver.getKnownModuleName(importedFilePath) ||
+            this._host.fileNameToModuleName(importedFilePath, containingFilePath);
+    };
+    AotCompiler.prototype._codegenStyles = function (srcFileUrl, compMeta, stylesheetMetadata, isShimmed, fileSuffix) {
+        var outputCtx = this._createOutputContext(_stylesModuleUrl(stylesheetMetadata.moduleUrl, isShimmed, fileSuffix));
+        var compiledStylesheet = this._styleCompiler.compileStyles(outputCtx, compMeta, stylesheetMetadata, isShimmed);
+        _resolveStyleStatements(this._symbolResolver, compiledStylesheet, isShimmed, fileSuffix);
+        return this._codegenSourceModule(srcFileUrl, outputCtx);
+    };
+    AotCompiler.prototype._codegenSourceModule = function (srcFileUrl, ctx) {
+        return new GeneratedFile(srcFileUrl, ctx.genFilePath, ctx.statements);
+    };
+    AotCompiler.prototype.listLazyRoutes = function (entryRoute, analyzedModules) {
+        var e_2, _a, e_3, _b;
+        var self = this;
+        if (entryRoute) {
+            var symbol = parseLazyRoute(entryRoute, this.reflector).referencedModule;
+            return visitLazyRoute(symbol);
+        }
+        else if (analyzedModules) {
+            var allLazyRoutes = [];
+            try {
+                for (var _c = __values(analyzedModules.ngModules), _d = _c.next(); !_d.done; _d = _c.next()) {
+                    var ngModule = _d.value;
+                    var lazyRoutes = listLazyRoutes(ngModule, this.reflector);
+                    try {
+                        for (var lazyRoutes_1 = __values(lazyRoutes), lazyRoutes_1_1 = lazyRoutes_1.next(); !lazyRoutes_1_1.done; lazyRoutes_1_1 = lazyRoutes_1.next()) {
+                            var lazyRoute = lazyRoutes_1_1.value;
+                            allLazyRoutes.push(lazyRoute);
+                        }
+                    }
+                    catch (e_3_1) { e_3 = { error: e_3_1 }; }
+                    finally {
+                        try {
+                            if (lazyRoutes_1_1 && !lazyRoutes_1_1.done && (_b = lazyRoutes_1.return)) _b.call(lazyRoutes_1);
+                        }
+                        finally { if (e_3) throw e_3.error; }
+                    }
+                }
+            }
+            catch (e_2_1) { e_2 = { error: e_2_1 }; }
+            finally {
+                try {
+                    if (_d && !_d.done && (_a = _c.return)) _a.call(_c);
+                }
+                finally { if (e_2) throw e_2.error; }
+            }
+            return allLazyRoutes;
+        }
+        else {
+            throw new Error("Either route or analyzedModules has to be specified!");
+        }
+        function visitLazyRoute(symbol, seenRoutes, allLazyRoutes) {
+            if (seenRoutes === void 0) { seenRoutes = new Set(); }
+            if (allLazyRoutes === void 0) { allLazyRoutes = []; }
+            var e_4, _a;
+            // Support pointing to default exports, but stop recursing there,
+            // as the StaticReflector does not yet support default exports.
+            if (seenRoutes.has(symbol) || !symbol.name) {
+                return allLazyRoutes;
+            }
+            seenRoutes.add(symbol);
+            var lazyRoutes = listLazyRoutes(self._metadataResolver.getNgModuleMetadata(symbol, true), self.reflector);
+            try {
+                for (var lazyRoutes_2 = __values(lazyRoutes), lazyRoutes_2_1 = lazyRoutes_2.next(); !lazyRoutes_2_1.done; lazyRoutes_2_1 = lazyRoutes_2.next()) {
+                    var lazyRoute = lazyRoutes_2_1.value;
+                    allLazyRoutes.push(lazyRoute);
+                    visitLazyRoute(lazyRoute.referencedModule, seenRoutes, allLazyRoutes);
+                }
+            }
+            catch (e_4_1) { e_4 = { error: e_4_1 }; }
+            finally {
+                try {
+                    if (lazyRoutes_2_1 && !lazyRoutes_2_1.done && (_a = lazyRoutes_2.return)) _a.call(lazyRoutes_2);
+                }
+                finally { if (e_4) throw e_4.error; }
+            }
+            return allLazyRoutes;
+        }
+    };
+    return AotCompiler;
+}());
+function _createEmptyStub(outputCtx) {
+    // Note: We need to produce at least one import statement so that
+    // TypeScript knows that the file is an es6 module. Otherwise our generated
+    // exports / imports won't be emitted properly by TypeScript.
+    outputCtx.statements.push(importExpr(Identifiers.ComponentFactory).toStmt());
+}
+function _resolveStyleStatements(symbolResolver, compileResult, needsShim, fileSuffix) {
+    compileResult.dependencies.forEach(function (dep) {
+        dep.setValue(symbolResolver.getStaticSymbol(_stylesModuleUrl(dep.moduleUrl, needsShim, fileSuffix), dep.name));
+    });
+}
+function _stylesModuleUrl(stylesheetUrl, shim, suffix) {
+    return "" + stylesheetUrl + (shim ? '.shim' : '') + ".ngstyle" + suffix;
+}
+function analyzeNgModules(fileNames, host, staticSymbolResolver, metadataResolver) {
+    var files = _analyzeFilesIncludingNonProgramFiles(fileNames, host, staticSymbolResolver, metadataResolver);
+    return mergeAnalyzedFiles(files);
+}
+function analyzeAndValidateNgModules(fileNames, host, staticSymbolResolver, metadataResolver) {
+    return validateAnalyzedModules(analyzeNgModules(fileNames, host, staticSymbolResolver, metadataResolver));
+}
+function validateAnalyzedModules(analyzedModules) {
+    if (analyzedModules.symbolsMissingModule && analyzedModules.symbolsMissingModule.length) {
+        var messages = analyzedModules.symbolsMissingModule.map(function (s) {
+            return "Cannot determine the module for class " + s.name + " in " + s.filePath + "! Add " + s.name + " to the NgModule to fix it.";
+        });
+        throw syntaxError(messages.join('\n'));
+    }
+    return analyzedModules;
+}
+// Analyzes all of the program files,
+// including files that are not part of the program
+// but are referenced by an NgModule.
+function _analyzeFilesIncludingNonProgramFiles(fileNames, host, staticSymbolResolver, metadataResolver) {
+    var seenFiles = new Set();
+    var files = [];
+    var visitFile = function (fileName) {
+        if (seenFiles.has(fileName) || !host.isSourceFile(fileName)) {
+            return false;
+        }
+        seenFiles.add(fileName);
+        var analyzedFile = analyzeFile(host, staticSymbolResolver, metadataResolver, fileName);
+        files.push(analyzedFile);
+        analyzedFile.ngModules.forEach(function (ngModule) {
+            ngModule.transitiveModule.modules.forEach(function (modMeta) { return visitFile(modMeta.reference.filePath); });
+        });
+    };
+    fileNames.forEach(function (fileName) { return visitFile(fileName); });
+    return files;
+}
+function analyzeFile(host, staticSymbolResolver, metadataResolver, fileName) {
+    var directives = [];
+    var pipes = [];
+    var injectables = [];
+    var ngModules = [];
+    var hasDecorators = staticSymbolResolver.hasDecorators(fileName);
+    var exportsNonSourceFiles = false;
+    // Don't analyze .d.ts files that have no decorators as a shortcut
+    // to speed up the analysis. This prevents us from
+    // resolving the references in these files.
+    // Note: exportsNonSourceFiles is only needed when compiling with summaries,
+    // which is not the case when .d.ts files are treated as input files.
+    if (!fileName.endsWith('.d.ts') || hasDecorators) {
+        staticSymbolResolver.getSymbolsOf(fileName).forEach(function (symbol) {
+            var resolvedSymbol = staticSymbolResolver.resolveSymbol(symbol);
+            var symbolMeta = resolvedSymbol.metadata;
+            if (!symbolMeta || symbolMeta.__symbolic === 'error') {
+                return;
+            }
+            var isNgSymbol = false;
+            if (symbolMeta.__symbolic === 'class') {
+                if (metadataResolver.isDirective(symbol)) {
+                    isNgSymbol = true;
+                    directives.push(symbol);
+                }
+                else if (metadataResolver.isPipe(symbol)) {
+                    isNgSymbol = true;
+                    pipes.push(symbol);
+                }
+                else if (metadataResolver.isNgModule(symbol)) {
+                    var ngModule = metadataResolver.getNgModuleMetadata(symbol, false);
+                    if (ngModule) {
+                        isNgSymbol = true;
+                        ngModules.push(ngModule);
+                    }
+                }
+                else if (metadataResolver.isInjectable(symbol)) {
+                    isNgSymbol = true;
+                    var injectable = metadataResolver.getInjectableMetadata(symbol, null, false);
+                    if (injectable) {
+                        injectables.push(injectable);
+                    }
+                }
+            }
+            if (!isNgSymbol) {
+                exportsNonSourceFiles =
+                    exportsNonSourceFiles || isValueExportingNonSourceFile(host, symbolMeta);
+            }
+        });
+    }
+    return {
+        fileName: fileName, directives: directives, pipes: pipes, ngModules: ngModules, injectables: injectables, exportsNonSourceFiles: exportsNonSourceFiles,
+    };
+}
+function analyzeFileForInjectables(host, staticSymbolResolver, metadataResolver, fileName) {
+    var injectables = [];
+    var shallowModules = [];
+    if (staticSymbolResolver.hasDecorators(fileName)) {
+        staticSymbolResolver.getSymbolsOf(fileName).forEach(function (symbol) {
+            var resolvedSymbol = staticSymbolResolver.resolveSymbol(symbol);
+            var symbolMeta = resolvedSymbol.metadata;
+            if (!symbolMeta || symbolMeta.__symbolic === 'error') {
+                return;
+            }
+            if (symbolMeta.__symbolic === 'class') {
+                if (metadataResolver.isInjectable(symbol)) {
+                    var injectable = metadataResolver.getInjectableMetadata(symbol, null, false);
+                    if (injectable) {
+                        injectables.push(injectable);
+                    }
+                }
+                else if (metadataResolver.isNgModule(symbol)) {
+                    var module = metadataResolver.getShallowModuleMetadata(symbol);
+                    if (module) {
+                        shallowModules.push(module);
+                    }
+                }
+            }
+        });
+    }
+    return { fileName: fileName, injectables: injectables, shallowModules: shallowModules };
+}
+function isValueExportingNonSourceFile(host, metadata) {
+    var exportsNonSourceFiles = false;
+    var Visitor = /** @class */ (function () {
+        function Visitor() {
+        }
+        Visitor.prototype.visitArray = function (arr, context) {
+            var _this = this;
+            arr.forEach(function (v) { return visitValue(v, _this, context); });
+        };
+        Visitor.prototype.visitStringMap = function (map, context) {
+            var _this = this;
+            Object.keys(map).forEach(function (key) { return visitValue(map[key], _this, context); });
+        };
+        Visitor.prototype.visitPrimitive = function (value, context) { };
+        Visitor.prototype.visitOther = function (value, context) {
+            if (value instanceof StaticSymbol && !host.isSourceFile(value.filePath)) {
+                exportsNonSourceFiles = true;
+            }
+        };
+        return Visitor;
+    }());
+    visitValue(metadata, new Visitor(), null);
+    return exportsNonSourceFiles;
+}
+function mergeAnalyzedFiles(analyzedFiles) {
+    var allNgModules = [];
+    var ngModuleByPipeOrDirective = new Map();
+    var allPipesAndDirectives = new Set();
+    analyzedFiles.forEach(function (af) {
+        af.ngModules.forEach(function (ngModule) {
+            allNgModules.push(ngModule);
+            ngModule.declaredDirectives.forEach(function (d) { return ngModuleByPipeOrDirective.set(d.reference, ngModule); });
+            ngModule.declaredPipes.forEach(function (p) { return ngModuleByPipeOrDirective.set(p.reference, ngModule); });
+        });
+        af.directives.forEach(function (d) { return allPipesAndDirectives.add(d); });
+        af.pipes.forEach(function (p) { return allPipesAndDirectives.add(p); });
+    });
+    var symbolsMissingModule = [];
+    allPipesAndDirectives.forEach(function (ref) {
+        if (!ngModuleByPipeOrDirective.has(ref)) {
+            symbolsMissingModule.push(ref);
+        }
+    });
+    return {
+        ngModules: allNgModules,
+        ngModuleByPipeOrDirective: ngModuleByPipeOrDirective,
+        symbolsMissingModule: symbolsMissingModule,
+        files: analyzedFiles
+    };
+}
+function mergeAndValidateNgFiles(files) {
+    return validateAnalyzedModules(mergeAnalyzedFiles(files));
+}
+
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+var FORMATTED_MESSAGE = 'ngFormattedMessage';
+function indentStr(level) {
+    if (level <= 0)
+        return '';
+    if (level < 6)
+        return ['', ' ', '  ', '   ', '    ', '     '][level];
+    var half = indentStr(Math.floor(level / 2));
+    return half + half + (level % 2 === 1 ? ' ' : '');
+}
+function formatChain(chain, indent) {
+    if (indent === void 0) { indent = 0; }
+    if (!chain)
+        return '';
+    var position = chain.position ?
+        chain.position.fileName + "(" + (chain.position.line + 1) + "," + (chain.position.column + 1) + ")" :
+        '';
+    var prefix = position && indent === 0 ? position + ": " : '';
+    var postfix = position && indent !== 0 ? " at " + position : '';
+    var message = "" + prefix + chain.message + postfix;
+    return "" + indentStr(indent) + message + ((chain.next && ('\n' + formatChain(chain.next, indent + 2))) || '');
+}
+function formattedError(chain) {
+    var message = formatChain(chain) + '.';
+    var error$$1 = syntaxError(message);
+    error$$1[FORMATTED_MESSAGE] = true;
+    error$$1.chain = chain;
+    error$$1.position = chain.position;
+    return error$$1;
+}
+function isFormattedError(error$$1) {
+    return !!error$$1[FORMATTED_MESSAGE];
+}
+
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+var ANGULAR_CORE = '@angular/core';
+var ANGULAR_ROUTER = '@angular/router';
+var HIDDEN_KEY = /^\$.*\$$/;
+var IGNORE = {
+    __symbolic: 'ignore'
+};
+var USE_VALUE$1 = 'useValue';
+var PROVIDE = 'provide';
+var REFERENCE_SET = new Set([USE_VALUE$1, 'useFactory', 'data', 'id', 'loadChildren']);
+var TYPEGUARD_POSTFIX = 'TypeGuard';
+var USE_IF = 'UseIf';
+function shouldIgnore(value) {
+    return value && value.__symbolic == 'ignore';
+}
+/**
+ * A static reflector implements enough of the Reflector API that is necessary to compile
+ * templates statically.
+ */
+var StaticReflector = /** @class */ (function () {
+    function StaticReflector(summaryResolver, symbolResolver, knownMetadataClasses, knownMetadataFunctions, errorRecorder) {
+        if (knownMetadataClasses === void 0) { knownMetadataClasses = []; }
+        if (knownMetadataFunctions === void 0) { knownMetadataFunctions = []; }
+        var _this = this;
+        this.summaryResolver = summaryResolver;
+        this.symbolResolver = symbolResolver;
+        this.errorRecorder = errorRecorder;
+        this.annotationCache = new Map();
+        this.shallowAnnotationCache = new Map();
+        this.propertyCache = new Map();
+        this.parameterCache = new Map();
+        this.methodCache = new Map();
+        this.staticCache = new Map();
+        this.conversionMap = new Map();
+        this.resolvedExternalReferences = new Map();
+        this.annotationForParentClassWithSummaryKind = new Map();
+        this.initializeConversionMap();
+        knownMetadataClasses.forEach(function (kc) { return _this._registerDecoratorOrConstructor(_this.getStaticSymbol(kc.filePath, kc.name), kc.ctor); });
+        knownMetadataFunctions.forEach(function (kf) { return _this._registerFunction(_this.getStaticSymbol(kf.filePath, kf.name), kf.fn); });
+        this.annotationForParentClassWithSummaryKind.set(CompileSummaryKind.Directive, [createDirective, createComponent]);
+        this.annotationForParentClassWithSummaryKind.set(CompileSummaryKind.Pipe, [createPipe]);
+        this.annotationForParentClassWithSummaryKind.set(CompileSummaryKind.NgModule, [createNgModule]);
+        this.annotationForParentClassWithSummaryKind.set(CompileSummaryKind.Injectable, [createInjectable, createPipe, createDirective, createComponent, createNgModule]);
+    }
+    StaticReflector.prototype.componentModuleUrl = function (typeOrFunc) {
+        var staticSymbol = this.findSymbolDeclaration(typeOrFunc);
+        return this.symbolResolver.getResourcePath(staticSymbol);
+    };
+    StaticReflector.prototype.resolveExternalReference = function (ref, containingFile) {
+        var key = undefined;
+        if (!containingFile) {
+            key = ref.moduleName + ":" + ref.name;
+            var declarationSymbol_1 = this.resolvedExternalReferences.get(key);
+            if (declarationSymbol_1)
+                return declarationSymbol_1;
+        }
+        var refSymbol = this.symbolResolver.getSymbolByModule(ref.moduleName, ref.name, containingFile);
+        var declarationSymbol = this.findSymbolDeclaration(refSymbol);
+        if (!containingFile) {
+            this.symbolResolver.recordModuleNameForFileName(refSymbol.filePath, ref.moduleName);
+            this.symbolResolver.recordImportAs(declarationSymbol, refSymbol);
+        }
+        if (key) {
+            this.resolvedExternalReferences.set(key, declarationSymbol);
+        }
+        return declarationSymbol;
+    };
+    StaticReflector.prototype.findDeclaration = function (moduleUrl, name, containingFile) {
+        return this.findSymbolDeclaration(this.symbolResolver.getSymbolByModule(moduleUrl, name, containingFile));
+    };
+    StaticReflector.prototype.tryFindDeclaration = function (moduleUrl, name, containingFile) {
+        var _this = this;
+        return this.symbolResolver.ignoreErrorsFor(function () { return _this.findDeclaration(moduleUrl, name, containingFile); });
+    };
+    StaticReflector.prototype.findSymbolDeclaration = function (symbol) {
+        var resolvedSymbol = this.symbolResolver.resolveSymbol(symbol);
+        if (resolvedSymbol) {
+            var resolvedMetadata = resolvedSymbol.metadata;
+            if (resolvedMetadata && resolvedMetadata.__symbolic === 'resolved') {
+                resolvedMetadata = resolvedMetadata.symbol;
+            }
+            if (resolvedMetadata instanceof StaticSymbol) {
+                return this.findSymbolDeclaration(resolvedSymbol.metadata);
+            }
+        }
+        return symbol;
+    };
+    StaticReflector.prototype.tryAnnotations = function (type) {
+        var originalRecorder = this.errorRecorder;
+        this.errorRecorder = function (error$$1, fileName) { };
+        try {
+            return this.annotations(type);
+        }
+        finally {
+            this.errorRecorder = originalRecorder;
+        }
+    };
+    StaticReflector.prototype.annotations = function (type) {
+        var _this = this;
+        return this._annotations(type, function (type, decorators) { return _this.simplify(type, decorators); }, this.annotationCache);
+    };
+    StaticReflector.prototype.shallowAnnotations = function (type) {
+        var _this = this;
+        return this._annotations(type, function (type, decorators) { return _this.simplify(type, decorators, true); }, this.shallowAnnotationCache);
+    };
+    StaticReflector.prototype._annotations = function (type, simplify, annotationCache) {
+        var annota

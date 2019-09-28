@@ -1,0 +1,462 @@
+trip (*) from character varying(5), timestamp(5)
+        # with time zone, geometry(POLYGON), etc.
+        attype = re.sub(r"\(.*\)", "", format_type)
+
+        # strip '[]' from integer[], etc. and check if an array
+        attype, is_array = _handle_array_type(attype)
+
+        # strip quotes from case sensitive enum or domain names
+        enum_or_domain_key = tuple(util.quoted_token_parser(attype))
+
+        nullable = not notnull
+
+        charlen = re.search(r"\(([\d,]+)\)", format_type)
+        if charlen:
+            charlen = charlen.group(1)
+        args = re.search(r"\((.*)\)", format_type)
+        if args and args.group(1):
+            args = tuple(re.split(r"\s*,\s*", args.group(1)))
+        else:
+            args = ()
+        kwargs = {}
+
+        if attype == "numeric":
+            if charlen:
+                prec, scale = charlen.split(",")
+                args = (int(prec), int(scale))
+            else:
+                args = ()
+        elif attype == "double precision":
+            args = (53,)
+        elif attype == "integer":
+            args = ()
+        elif attype in ("timestamp with time zone", "time with time zone"):
+            kwargs["timezone"] = True
+            if charlen:
+                kwargs["precision"] = int(charlen)
+            args = ()
+        elif attype in (
+            "timestamp without time zone",
+            "time without time zone",
+            "time",
+        ):
+            kwargs["timezone"] = False
+            if charlen:
+                kwargs["precision"] = int(charlen)
+            args = ()
+        elif attype == "bit varying":
+            kwargs["varying"] = True
+            if charlen:
+                args = (int(charlen),)
+            else:
+                args = ()
+        elif attype.startswith("interval"):
+            field_match = re.match(r"interval (.+)", attype, re.I)
+            if charlen:
+                kwargs["precision"] = int(charlen)
+            if field_match:
+                kwargs["fields"] = field_match.group(1)
+            attype = "interval"
+            args = ()
+        elif charlen:
+            args = (int(charlen),)
+
+        while True:
+            # looping here to suit nested domains
+            if attype in self.ischema_names:
+                coltype = self.ischema_names[attype]
+                break
+            elif enum_or_domain_key in enums:
+                enum = enums[enum_or_domain_key]
+                coltype = ENUM
+                kwargs["name"] = enum["name"]
+                if not enum["visible"]:
+                    kwargs["schema"] = enum["schema"]
+                args = tuple(enum["labels"])
+                break
+            elif enum_or_domain_key in domains:
+                domain = domains[enum_or_domain_key]
+                attype = domain["attype"]
+                attype, is_array = _handle_array_type(attype)
+                # strip quotes from case sensitive enum or domain names
+                enum_or_domain_key = tuple(util.quoted_token_parser(attype))
+                # A table can't override whether the domain is nullable.
+                nullable = domain["nullable"]
+                if domain["default"] and not default:
+                    # It can, however, override the default
+                    # value, but can't set it to null.
+                    default = domain["default"]
+                continue
+            else:
+                coltype = None
+                break
+
+        if coltype:
+            coltype = coltype(*args, **kwargs)
+            if is_array:
+                coltype = self.ischema_names["_array"](coltype)
+        else:
+            util.warn(
+                "Did not recognize type '%s' of column '%s'" % (attype, name)
+            )
+            coltype = sqltypes.NULLTYPE
+        # adjust the default value
+        autoincrement = False
+        if default is not None:
+            match = re.search(r"""(nextval\(')([^']+)('.*$)""", default)
+            if match is not None:
+                if issubclass(coltype._type_affinity, sqltypes.Integer):
+                    autoincrement = True
+                # the default is related to a Sequence
+                sch = schema
+                if "." not in match.group(2) and sch is not None:
+                    # unconditionally quote the schema name.  this could
+                    # later be enhanced to obey quoting rules /
+                    # "quote schema"
+                    default = (
+                        match.group(1)
+                        + ('"%s"' % sch)
+                        + "."
+                        + match.group(2)
+                        + match.group(3)
+                    )
+
+        column_info = dict(
+            name=name,
+            type=coltype,
+            nullable=nullable,
+            default=default,
+            autoincrement=autoincrement,
+            comment=comment,
+        )
+        return column_info
+
+    @reflection.cache
+    def get_pk_constraint(self, connection, table_name, schema=None, **kw):
+        table_oid = self.get_table_oid(
+            connection, table_name, schema, info_cache=kw.get("info_cache")
+        )
+
+        if self.server_version_info < (8, 4):
+            PK_SQL = """
+                SELECT a.attname
+                FROM
+                    pg_class t
+                    join pg_index ix on t.oid = ix.indrelid
+                    join pg_attribute a
+                        on t.oid=a.attrelid AND %s
+                 WHERE
+                  t.oid = :table_oid and ix.indisprimary = 't'
+                ORDER BY a.attnum
+            """ % self._pg_index_any(
+                "a.attnum", "ix.indkey"
+            )
+
+        else:
+            # unnest() and generate_subscripts() both introduced in
+            # version 8.4
+            PK_SQL = """
+                SELECT a.attname
+                FROM pg_attribute a JOIN (
+                    SELECT unnest(ix.indkey) attnum,
+                           generate_subscripts(ix.indkey, 1) ord
+                    FROM pg_index ix
+                    WHERE ix.indrelid = :table_oid AND ix.indisprimary
+                    ) k ON a.attnum=k.attnum
+                WHERE a.attrelid = :table_oid
+                ORDER BY k.ord
+            """
+        t = sql.text(PK_SQL).columns(attname=sqltypes.Unicode)
+        c = connection.execute(t, table_oid=table_oid)
+        cols = [r[0] for r in c.fetchall()]
+
+        PK_CONS_SQL = """
+        SELECT conname
+           FROM  pg_catalog.pg_constraint r
+           WHERE r.conrelid = :table_oid AND r.contype = 'p'
+           ORDER BY 1
+        """
+        t = sql.text(PK_CONS_SQL).columns(conname=sqltypes.Unicode)
+        c = connection.execute(t, table_oid=table_oid)
+        name = c.scalar()
+
+        return {"constrained_columns": cols, "name": name}
+
+    @reflection.cache
+    def get_foreign_keys(
+        self,
+        connection,
+        table_name,
+        schema=None,
+        postgresql_ignore_search_path=False,
+        **kw
+    ):
+        preparer = self.identifier_preparer
+        table_oid = self.get_table_oid(
+            connection, table_name, schema, info_cache=kw.get("info_cache")
+        )
+
+        FK_SQL = """
+          SELECT r.conname,
+                pg_catalog.pg_get_constraintdef(r.oid, true) as condef,
+                n.nspname as conschema
+          FROM  pg_catalog.pg_constraint r,
+                pg_namespace n,
+                pg_class c
+
+          WHERE r.conrelid = :table AND
+                r.contype = 'f' AND
+                c.oid = confrelid AND
+                n.oid = c.relnamespace
+          ORDER BY 1
+        """
+        # http://www.postgresql.org/docs/9.0/static/sql-createtable.html
+        FK_REGEX = re.compile(
+            r"FOREIGN KEY \((.*?)\) REFERENCES (?:(.*?)\.)?(.*?)\((.*?)\)"
+            r"[\s]?(MATCH (FULL|PARTIAL|SIMPLE)+)?"
+            r"[\s]?(ON UPDATE "
+            r"(CASCADE|RESTRICT|NO ACTION|SET NULL|SET DEFAULT)+)?"
+            r"[\s]?(ON DELETE "
+            r"(CASCADE|RESTRICT|NO ACTION|SET NULL|SET DEFAULT)+)?"
+            r"[\s]?(DEFERRABLE|NOT DEFERRABLE)?"
+            r"[\s]?(INITIALLY (DEFERRED|IMMEDIATE)+)?"
+        )
+
+        t = sql.text(FK_SQL).columns(
+            conname=sqltypes.Unicode, condef=sqltypes.Unicode
+        )
+        c = connection.execute(t, table=table_oid)
+        fkeys = []
+        for conname, condef, conschema in c.fetchall():
+            m = re.search(FK_REGEX, condef).groups()
+
+            (
+                constrained_columns,
+                referred_schema,
+                referred_table,
+                referred_columns,
+                _,
+                match,
+                _,
+                onupdate,
+                _,
+                ondelete,
+                deferrable,
+                _,
+                initially,
+            ) = m
+
+            if deferrable is not None:
+                deferrable = True if deferrable == "DEFERRABLE" else False
+            constrained_columns = [
+                preparer._unquote_identifier(x)
+                for x in re.split(r"\s*,\s*", constrained_columns)
+            ]
+
+            if postgresql_ignore_search_path:
+                # when ignoring search path, we use the actual schema
+                # provided it isn't the "default" schema
+                if conschema != self.default_schema_name:
+                    referred_schema = conschema
+                else:
+                    referred_schema = schema
+            elif referred_schema:
+                # referred_schema is the schema that we regexp'ed from
+                # pg_get_constraintdef().  If the schema is in the search
+                # path, pg_get_constraintdef() will give us None.
+                referred_schema = preparer._unquote_identifier(referred_schema)
+            elif schema is not None and schema == conschema:
+                # If the actual schema matches the schema of the table
+                # we're reflecting, then we will use that.
+                referred_schema = schema
+
+            referred_table = preparer._unquote_identifier(referred_table)
+            referred_columns = [
+                preparer._unquote_identifier(x)
+                for x in re.split(r"\s*,\s", referred_columns)
+            ]
+            fkey_d = {
+                "name": conname,
+                "constrained_columns": constrained_columns,
+                "referred_schema": referred_schema,
+                "referred_table": referred_table,
+                "referred_columns": referred_columns,
+                "options": {
+                    "onupdate": onupdate,
+                    "ondelete": ondelete,
+                    "deferrable": deferrable,
+                    "initially": initially,
+                    "match": match,
+                },
+            }
+            fkeys.append(fkey_d)
+        return fkeys
+
+    def _pg_index_any(self, col, compare_to):
+        if self.server_version_info < (8, 1):
+            # http://www.postgresql.org/message-id/10279.1124395722@sss.pgh.pa.us
+            # "In CVS tip you could replace this with "attnum = ANY (indkey)".
+            # Unfortunately, most array support doesn't work on int2vector in
+            # pre-8.1 releases, so I think you're kinda stuck with the above
+            # for now.
+            # regards, tom lane"
+            return "(%s)" % " OR ".join(
+                "%s[%d] = %s" % (compare_to, ind, col) for ind in range(0, 10)
+            )
+        else:
+            return "%s = ANY(%s)" % (col, compare_to)
+
+    @reflection.cache
+    def get_indexes(self, connection, table_name, schema, **kw):
+        table_oid = self.get_table_oid(
+            connection, table_name, schema, info_cache=kw.get("info_cache")
+        )
+
+        # cast indkey as varchar since it's an int2vector,
+        # returned as a list by some drivers such as pypostgresql
+
+        if self.server_version_info < (8, 5):
+            IDX_SQL = """
+              SELECT
+                  i.relname as relname,
+                  ix.indisunique, ix.indexprs, ix.indpred,
+                  a.attname, a.attnum, NULL, ix.indkey%s,
+                  %s, am.amname
+              FROM
+                  pg_class t
+                        join pg_index ix on t.oid = ix.indrelid
+                        join pg_class i on i.oid = ix.indexrelid
+                        left outer join
+                            pg_attribute a
+                            on t.oid = a.attrelid and %s
+                        left outer join
+                            pg_am am
+                            on i.relam = am.oid
+              WHERE
+                  t.relkind IN ('r', 'v', 'f', 'm')
+                  and t.oid = :table_oid
+                  and ix.indisprimary = 'f'
+              ORDER BY
+                  t.relname,
+                  i.relname
+            """ % (
+                # version 8.3 here was based on observing the
+                # cast does not work in PG 8.2.4, does work in 8.3.0.
+                # nothing in PG changelogs regarding this.
+                "::varchar" if self.server_version_info >= (8, 3) else "",
+                "i.reloptions"
+                if self.server_version_info >= (8, 2)
+                else "NULL",
+                self._pg_index_any("a.attnum", "ix.indkey"),
+            )
+        else:
+            IDX_SQL = """
+              SELECT
+                  i.relname as relname,
+                  ix.indisunique, ix.indexprs, ix.indpred,
+                  a.attname, a.attnum, c.conrelid, ix.indkey::varchar,
+                  i.reloptions, am.amname
+              FROM
+                  pg_class t
+                        join pg_index ix on t.oid = ix.indrelid
+                        join pg_class i on i.oid = ix.indexrelid
+                        left outer join
+                            pg_attribute a
+                            on t.oid = a.attrelid and a.attnum = ANY(ix.indkey)
+                        left outer join
+                            pg_constraint c
+                            on (ix.indrelid = c.conrelid and
+                                ix.indexrelid = c.conindid and
+                                c.contype in ('p', 'u', 'x'))
+                        left outer join
+                            pg_am am
+                            on i.relam = am.oid
+              WHERE
+                  t.relkind IN ('r', 'v', 'f', 'm')
+                  and t.oid = :table_oid
+                  and ix.indisprimary = 'f'
+              ORDER BY
+                  t.relname,
+                  i.relname
+            """
+
+        t = sql.text(IDX_SQL).columns(
+            relname=sqltypes.Unicode, attname=sqltypes.Unicode
+        )
+        c = connection.execute(t, table_oid=table_oid)
+
+        indexes = defaultdict(lambda: defaultdict(dict))
+
+        sv_idx_name = None
+        for row in c.fetchall():
+            (
+                idx_name,
+                unique,
+                expr,
+                prd,
+                col,
+                col_num,
+                conrelid,
+                idx_key,
+                options,
+                amname,
+            ) = row
+
+            if expr:
+                if idx_name != sv_idx_name:
+                    util.warn(
+                        "Skipped unsupported reflection of "
+                        "expression-based index %s" % idx_name
+                    )
+                sv_idx_name = idx_name
+                continue
+
+            if prd and not idx_name == sv_idx_name:
+                util.warn(
+                    "Predicate of partial index %s ignored during reflection"
+                    % idx_name
+                )
+                sv_idx_name = idx_name
+
+            has_idx = idx_name in indexes
+            index = indexes[idx_name]
+            if col is not None:
+                index["cols"][col_num] = col
+            if not has_idx:
+                index["key"] = [int(k.strip()) for k in idx_key.split()]
+                index["unique"] = unique
+                if conrelid is not None:
+                    index["duplicates_constraint"] = idx_name
+                if options:
+                    index["options"] = dict(
+                        [option.split("=") for option in options]
+                    )
+
+                # it *might* be nice to include that this is 'btree' in the
+                # reflection info.  But we don't want an Index object
+                # to have a ``postgresql_using`` in it that is just the
+                # default, so for the moment leaving this out.
+                if amname and amname != "btree":
+                    index["amname"] = amname
+
+        result = []
+        for name, idx in indexes.items():
+            entry = {
+                "name": name,
+                "unique": idx["unique"],
+                "column_names": [idx["cols"][i] for i in idx["key"]],
+            }
+            if "duplicates_constraint" in idx:
+                entry["duplicates_constraint"] = idx["duplicates_constraint"]
+            if "options" in idx:
+                entry.setdefault("dialect_options", {})[
+                    "postgresql_with"
+                ] = idx["options"]
+            if "amname" in idx:
+                entry.setdefault("dialect_options", {})[
+                    "postgresql_using"
+                ] = idx["amname"]
+            result.append(entry)
+        return result
+
+    @reflection.ca

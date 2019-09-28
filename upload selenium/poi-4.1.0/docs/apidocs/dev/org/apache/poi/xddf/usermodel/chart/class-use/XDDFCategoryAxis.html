@@ -1,0 +1,247 @@
+QL allows storage parameters to be set on indexes. The storage
+parameters available depend on the index method used by the index. Storage
+parameters can be specified on :class:`.Index` using the ``postgresql_with``
+keyword argument::
+
+    Index('my_index', my_table.c.data, postgresql_with={"fillfactor": 50})
+
+.. versionadded:: 1.0.6
+
+PostgreSQL allows to define the tablespace in which to create the index.
+The tablespace can be specified on :class:`.Index` using the
+``postgresql_tablespace`` keyword argument::
+
+    Index('my_index', my_table.c.data, postgresql_tablespace='my_tablespace')
+
+.. versionadded:: 1.1
+
+Note that the same option is available on :class:`.Table` as well.
+
+.. _postgresql_index_concurrently:
+
+Indexes with CONCURRENTLY
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The PostgreSQL index option CONCURRENTLY is supported by passing the
+flag ``postgresql_concurrently`` to the :class:`.Index` construct::
+
+    tbl = Table('testtbl', m, Column('data', Integer))
+
+    idx1 = Index('test_idx1', tbl.c.data, postgresql_concurrently=True)
+
+The above index construct will render DDL for CREATE INDEX, assuming
+PostgreSQL 8.2 or higher is detected or for a connection-less dialect, as::
+
+    CREATE INDEX CONCURRENTLY test_idx1 ON testtbl (data)
+
+For DROP INDEX, assuming PostgreSQL 9.2 or higher is detected or for
+a connection-less dialect, it will emit::
+
+    DROP INDEX CONCURRENTLY test_idx1
+
+.. versionadded:: 1.1 support for CONCURRENTLY on DROP INDEX.  The
+   CONCURRENTLY keyword is now only emitted if a high enough version
+   of PostgreSQL is detected on the connection (or for a connection-less
+   dialect).
+
+When using CONCURRENTLY, the PostgreSQL database requires that the statement
+be invoked outside of a transaction block.   The Python DBAPI enforces that
+even for a single statement, a transaction is present, so to use this
+construct, the DBAPI's "autocommit" mode must be used::
+
+    metadata = MetaData()
+    table = Table(
+        "foo", metadata,
+        Column("id", String))
+    index = Index(
+        "foo_idx", table.c.id, postgresql_concurrently=True)
+
+    with engine.connect() as conn:
+        with conn.execution_options(isolation_level='AUTOCOMMIT'):
+            table.create(conn)
+
+.. seealso::
+
+    :ref:`postgresql_isolation_level`
+
+.. _postgresql_index_reflection:
+
+PostgreSQL Index Reflection
+---------------------------
+
+The PostgreSQL database creates a UNIQUE INDEX implicitly whenever the
+UNIQUE CONSTRAINT construct is used.   When inspecting a table using
+:class:`.Inspector`, the :meth:`.Inspector.get_indexes`
+and the :meth:`.Inspector.get_unique_constraints` will report on these
+two constructs distinctly; in the case of the index, the key
+``duplicates_constraint`` will be present in the index entry if it is
+detected as mirroring a constraint.   When performing reflection using
+``Table(..., autoload=True)``, the UNIQUE INDEX is **not** returned
+in :attr:`.Table.indexes` when it is detected as mirroring a
+:class:`.UniqueConstraint` in the :attr:`.Table.constraints` collection.
+
+.. versionchanged:: 1.0.0 - :class:`.Table` reflection now includes
+   :class:`.UniqueConstraint` objects present in the :attr:`.Table.constraints`
+   collection; the PostgreSQL backend will no longer include a "mirrored"
+   :class:`.Index` construct in :attr:`.Table.indexes` if it is detected
+   as corresponding to a unique constraint.
+
+Special Reflection Options
+--------------------------
+
+The :class:`.Inspector` used for the PostgreSQL backend is an instance
+of :class:`.PGInspector`, which offers additional methods::
+
+    from sqlalchemy import create_engine, inspect
+
+    engine = create_engine("postgresql+psycopg2://localhost/test")
+    insp = inspect(engine)  # will be a PGInspector
+
+    print(insp.get_enums())
+
+.. autoclass:: PGInspector
+    :members:
+
+.. _postgresql_table_options:
+
+PostgreSQL Table Options
+------------------------
+
+Several options for CREATE TABLE are supported directly by the PostgreSQL
+dialect in conjunction with the :class:`.Table` construct:
+
+* ``TABLESPACE``::
+
+    Table("some_table", metadata, ..., postgresql_tablespace='some_tablespace')
+
+  The above option is also available on the :class:`.Index` construct.
+
+* ``ON COMMIT``::
+
+    Table("some_table", metadata, ..., postgresql_on_commit='PRESERVE ROWS')
+
+* ``WITH OIDS``::
+
+    Table("some_table", metadata, ..., postgresql_with_oids=True)
+
+* ``WITHOUT OIDS``::
+
+    Table("some_table", metadata, ..., postgresql_with_oids=False)
+
+* ``INHERITS``::
+
+    Table("some_table", metadata, ..., postgresql_inherits="some_supertable")
+
+    Table("some_table", metadata, ..., postgresql_inherits=("t1", "t2", ...))
+
+    .. versionadded:: 1.0.0
+
+* ``PARTITION BY``::
+
+    Table("some_table", metadata, ...,
+          postgresql_partition_by='LIST (part_column)')
+
+    .. versionadded:: 1.2.6
+
+.. seealso::
+
+    `PostgreSQL CREATE TABLE options
+    <http://www.postgresql.org/docs/current/static/sql-createtable.html>`_
+
+ARRAY Types
+-----------
+
+The PostgreSQL dialect supports arrays, both as multidimensional column types
+as well as array literals:
+
+* :class:`.postgresql.ARRAY` - ARRAY datatype
+
+* :class:`.postgresql.array` - array literal
+
+* :func:`.postgresql.array_agg` - ARRAY_AGG SQL function
+
+* :class:`.postgresql.aggregate_order_by` - helper for PG's ORDER BY aggregate
+  function syntax.
+
+JSON Types
+----------
+
+The PostgreSQL dialect supports both JSON and JSONB datatypes, including
+psycopg2's native support and support for all of PostgreSQL's special
+operators:
+
+* :class:`.postgresql.JSON`
+
+* :class:`.postgresql.JSONB`
+
+HSTORE Type
+-----------
+
+The PostgreSQL HSTORE type as well as hstore literals are supported:
+
+* :class:`.postgresql.HSTORE` - HSTORE datatype
+
+* :class:`.postgresql.hstore` - hstore literal
+
+ENUM Types
+----------
+
+PostgreSQL has an independently creatable TYPE structure which is used
+to implement an enumerated type.   This approach introduces significant
+complexity on the SQLAlchemy side in terms of when this type should be
+CREATED and DROPPED.   The type object is also an independently reflectable
+entity.   The following sections should be consulted:
+
+* :class:`.postgresql.ENUM` - DDL and typing support for ENUM.
+
+* :meth:`.PGInspector.get_enums` - retrieve a listing of current ENUM types
+
+* :meth:`.postgresql.ENUM.create` , :meth:`.postgresql.ENUM.drop` - individual
+  CREATE and DROP commands for ENUM.
+
+.. _postgresql_array_of_enum:
+
+Using ENUM with ARRAY
+^^^^^^^^^^^^^^^^^^^^^
+
+The combination of ENUM and ARRAY is not directly supported by backend
+DBAPIs at this time.   In order to send and receive an ARRAY of ENUM,
+use the following workaround type, which decorates the
+:class:`.postgresql.ARRAY` datatype.
+
+.. sourcecode:: python
+
+    from sqlalchemy import TypeDecorator
+    from sqlalchemy.dialects.postgresql import ARRAY
+
+    class ArrayOfEnum(TypeDecorator):
+        impl = ARRAY
+
+        def bind_expression(self, bindvalue):
+            return sa.cast(bindvalue, self)
+
+        def result_processor(self, dialect, coltype):
+            super_rp = super(ArrayOfEnum, self).result_processor(
+                dialect, coltype)
+
+            def handle_raw_string(value):
+                inner = re.match(r"^{(.*)}$", value).group(1)
+                return inner.split(",") if inner else []
+
+            def process(value):
+                if value is None:
+                    return None
+                return super_rp(handle_raw_string(value))
+            return process
+
+E.g.::
+
+    Table(
+        'mydata', metadata,
+        Column('id', Integer, primary_key=True),
+        Column('data', ArrayOfEnum(ENUM('a', 'b, 'c', name='myenum')))
+
+    )
+
+This type is not included as a built-in type as it would be incompatible
+with a DBAPI that sudde

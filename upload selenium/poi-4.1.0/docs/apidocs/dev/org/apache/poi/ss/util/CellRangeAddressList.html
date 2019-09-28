@@ -1,0 +1,655 @@
+agment
+  var fp = fragment;
+  var fq = '';
+  // split into path and query if possible at the first '?'
+  var pos = fragment.indexOf('?');
+  if(pos > 0) {
+    fp = fragment.substring(0, pos);
+    fq = fragment.substring(pos + 1);
+  }
+  // split path based on '/' and ignore first element if empty
+  var path = fp.split('/');
+  if(path.length > 0 && path[0] === '') {
+    path.shift();
+  }
+  // convert query into object
+  var query = (fq === '') ? {} : util.getQueryVariables(fq);
+
+  return {
+    pathString: fp,
+    queryString: fq,
+    path: path,
+    query: query
+  };
+};
+
+/**
+ * Makes a request out of a URI-like request string. This is intended to
+ * be used where a fragment id (after a URI '#') is parsed as a URI with
+ * path and query parts. The string should have a path beginning and
+ * delimited by '/' and optional query parameters following a '?'. The
+ * query should be a standard URL set of key value pairs delimited by
+ * '&'. For backwards compatibility the initial '/' on the path is not
+ * required. The request object has the following API, (fully described
+ * in the method code):
+ *    {
+ *       path: <the path string part>.
+ *       query: <the query string part>,
+ *       getPath(i): get part or all of the split path array,
+ *       getQuery(k, i): get part or all of a query key array,
+ *       getQueryLast(k, _default): get last element of a query key array.
+ *    }
+ *
+ * @return object with request parameters.
+ */
+util.makeRequest = function(reqString) {
+  var frag = util.parseFragment(reqString);
+  var req = {
+    // full path string
+    path: frag.pathString,
+    // full query string
+    query: frag.queryString,
+    /**
+     * Get path or element in path.
+     *
+     * @param i optional path index.
+     *
+     * @return path or part of path if i provided.
+     */
+    getPath: function(i) {
+      return (typeof(i) === 'undefined') ? frag.path : frag.path[i];
+    },
+    /**
+     * Get query, values for a key, or value for a key index.
+     *
+     * @param k optional query key.
+     * @param i optional query key index.
+     *
+     * @return query, values for a key, or value for a key index.
+     */
+    getQuery: function(k, i) {
+      var rval;
+      if(typeof(k) === 'undefined') {
+        rval = frag.query;
+      } else {
+        rval = frag.query[k];
+        if(rval && typeof(i) !== 'undefined') {
+           rval = rval[i];
+        }
+      }
+      return rval;
+    },
+    getQueryLast: function(k, _default) {
+      var rval;
+      var vals = req.getQuery(k);
+      if(vals) {
+        rval = vals[vals.length - 1];
+      } else {
+        rval = _default;
+      }
+      return rval;
+    }
+  };
+  return req;
+};
+
+/**
+ * Makes a URI out of a path, an object with query parameters, and a
+ * fragment. Uses jQuery.param() internally for query string creation.
+ * If the path is an array, it will be joined with '/'.
+ *
+ * @param path string path or array of strings.
+ * @param query object with query parameters. (optional)
+ * @param fragment fragment string. (optional)
+ *
+ * @return string object with request parameters.
+ */
+util.makeLink = function(path, query, fragment) {
+  // join path parts if needed
+  path = jQuery.isArray(path) ? path.join('/') : path;
+
+  var qstr = jQuery.param(query || {});
+  fragment = fragment || '';
+  return path +
+    ((qstr.length > 0) ? ('?' + qstr) : '') +
+    ((fragment.length > 0) ? ('#' + fragment) : '');
+};
+
+/**
+ * Follows a path of keys deep into an object hierarchy and set a value.
+ * If a key does not exist or it's value is not an object, create an
+ * object in it's place. This can be destructive to a object tree if
+ * leaf nodes are given as non-final path keys.
+ * Used to avoid exceptions from missing parts of the path.
+ *
+ * @param object the starting object.
+ * @param keys an array of string keys.
+ * @param value the value to set.
+ */
+util.setPath = function(object, keys, value) {
+  // need to start at an object
+  if(typeof(object) === 'object' && object !== null) {
+    var i = 0;
+    var len = keys.length;
+    while(i < len) {
+      var next = keys[i++];
+      if(i == len) {
+        // last
+        object[next] = value;
+      } else {
+        // more
+        var hasNext = (next in object);
+        if(!hasNext ||
+          (hasNext && typeof(object[next]) !== 'object') ||
+          (hasNext && object[next] === null)) {
+          object[next] = {};
+        }
+        object = object[next];
+      }
+    }
+  }
+};
+
+/**
+ * Follows a path of keys deep into an object hierarchy and return a value.
+ * If a key does not exist, create an object in it's place.
+ * Used to avoid exceptions from missing parts of the path.
+ *
+ * @param object the starting object.
+ * @param keys an array of string keys.
+ * @param _default value to return if path not found.
+ *
+ * @return the value at the path if found, else default if given, else
+ *         undefined.
+ */
+util.getPath = function(object, keys, _default) {
+  var i = 0;
+  var len = keys.length;
+  var hasNext = true;
+  while(hasNext && i < len &&
+    typeof(object) === 'object' && object !== null) {
+    var next = keys[i++];
+    hasNext = next in object;
+    if(hasNext) {
+      object = object[next];
+    }
+  }
+  return (hasNext ? object : _default);
+};
+
+/**
+ * Follow a path of keys deep into an object hierarchy and delete the
+ * last one. If a key does not exist, do nothing.
+ * Used to avoid exceptions from missing parts of the path.
+ *
+ * @param object the starting object.
+ * @param keys an array of string keys.
+ */
+util.deletePath = function(object, keys) {
+  // need to start at an object
+  if(typeof(object) === 'object' && object !== null) {
+    var i = 0;
+    var len = keys.length;
+    while(i < len) {
+      var next = keys[i++];
+      if(i == len) {
+        // last
+        delete object[next];
+      } else {
+        // more
+        if(!(next in object) ||
+          (typeof(object[next]) !== 'object') ||
+          (object[next] === null)) {
+           break;
+        }
+        object = object[next];
+      }
+    }
+  }
+};
+
+/**
+ * Check if an object is empty.
+ *
+ * Taken from:
+ * http://stackoverflow.com/questions/679915/how-do-i-test-for-an-empty-javascript-object-from-json/679937#679937
+ *
+ * @param object the object to check.
+ */
+util.isEmpty = function(obj) {
+  for(var prop in obj) {
+    if(obj.hasOwnProperty(prop)) {
+      return false;
+    }
+  }
+  return true;
+};
+
+/**
+ * Format with simple printf-style interpolation.
+ *
+ * %%: literal '%'
+ * %s,%o: convert next argument into a string.
+ *
+ * @param format the string to format.
+ * @param ... arguments to interpolate into the format string.
+ */
+util.format = function(format) {
+  var re = /%./g;
+  // current match
+  var match;
+  // current part
+  var part;
+  // current arg index
+  var argi = 0;
+  // collected parts to recombine later
+  var parts = [];
+  // last index found
+  var last = 0;
+  // loop while matches remain
+  while((match = re.exec(format))) {
+    part = format.substring(last, re.lastIndex - 2);
+    // don't add empty strings (ie, parts between %s%s)
+    if(part.length > 0) {
+      parts.push(part);
+    }
+    last = re.lastIndex;
+    // switch on % code
+    var code = match[0][1];
+    switch(code) {
+    case 's':
+    case 'o':
+      // check if enough arguments were given
+      if(argi < arguments.length) {
+        parts.push(arguments[argi++ + 1]);
+      } else {
+        parts.push('<?>');
+      }
+      break;
+    // FIXME: do proper formating for numbers, etc
+    //case 'f':
+    //case 'd':
+    case '%':
+      parts.push('%');
+      break;
+    default:
+      parts.push('<%' + code + '?>');
+    }
+  }
+  // add trailing part of format string
+  parts.push(format.substring(last));
+  return parts.join('');
+};
+
+/**
+ * Formats a number.
+ *
+ * http://snipplr.com/view/5945/javascript-numberformat--ported-from-php/
+ */
+util.formatNumber = function(number, decimals, dec_point, thousands_sep) {
+  // http://kevin.vanzonneveld.net
+  // +   original by: Jonas Raoni Soares Silva (http://www.jsfromhell.com)
+  // +   improved by: Kevin van Zonneveld (http://kevin.vanzonneveld.net)
+  // +     bugfix by: Michael White (http://crestidg.com)
+  // +     bugfix by: Benjamin Lupton
+  // +     bugfix by: Allan Jensen (http://www.winternet.no)
+  // +    revised by: Jonas Raoni Soares Silva (http://www.jsfromhell.com)
+  // *     example 1: number_format(1234.5678, 2, '.', '');
+  // *     returns 1: 1234.57
+
+  var n = number, c = isNaN(decimals = Math.abs(decimals)) ? 2 : decimals;
+  var d = dec_point === undefined ? ',' : dec_point;
+  var t = thousands_sep === undefined ?
+   '.' : thousands_sep, s = n < 0 ? '-' : '';
+  var i = parseInt((n = Math.abs(+n || 0).toFixed(c)), 10) + '';
+  var j = (i.length > 3) ? i.length % 3 : 0;
+  return s + (j ? i.substr(0, j) + t : '') +
+    i.substr(j).replace(/(\d{3})(?=\d)/g, '$1' + t) +
+    (c ? d + Math.abs(n - i).toFixed(c).slice(2) : '');
+};
+
+/**
+ * Formats a byte size.
+ *
+ * http://snipplr.com/view/5949/format-humanize-file-byte-size-presentation-in-javascript/
+ */
+util.formatSize = function(size) {
+  if(size >= 1073741824) {
+    size = util.formatNumber(size / 1073741824, 2, '.', '') + ' GiB';
+  } else if(size >= 1048576) {
+    size = util.formatNumber(size / 1048576, 2, '.', '') + ' MiB';
+  } else if(size >= 1024) {
+    size = util.formatNumber(size / 1024, 0) + ' KiB';
+  } else {
+    size = util.formatNumber(size, 0) + ' bytes';
+  }
+  return size;
+};
+
+/**
+ * Converts an IPv4 or IPv6 string representation into bytes (in network order).
+ *
+ * @param ip the IPv4 or IPv6 address to convert.
+ *
+ * @return the 4-byte IPv6 or 16-byte IPv6 address or null if the address can't
+ *         be parsed.
+ */
+util.bytesFromIP = function(ip) {
+  if(ip.indexOf('.') !== -1) {
+    return util.bytesFromIPv4(ip);
+  }
+  if(ip.indexOf(':') !== -1) {
+    return util.bytesFromIPv6(ip);
+  }
+  return null;
+};
+
+/**
+ * Converts an IPv4 string representation into bytes (in network order).
+ *
+ * @param ip the IPv4 address to convert.
+ *
+ * @return the 4-byte address or null if the address can't be parsed.
+ */
+util.bytesFromIPv4 = function(ip) {
+  ip = ip.split('.');
+  if(ip.length !== 4) {
+    return null;
+  }
+  var b = util.createBuffer();
+  for(var i = 0; i < ip.length; ++i) {
+    var num = parseInt(ip[i], 10);
+    if(isNaN(num)) {
+      return null;
+    }
+    b.putByte(num);
+  }
+  return b.getBytes();
+};
+
+/**
+ * Converts an IPv6 string representation into bytes (in network order).
+ *
+ * @param ip the IPv6 address to convert.
+ *
+ * @return the 16-byte address or null if the address can't be parsed.
+ */
+util.bytesFromIPv6 = function(ip) {
+  var blanks = 0;
+  ip = ip.split(':').filter(function(e) {
+    if(e.length === 0) ++blanks;
+    return true;
+  });
+  var zeros = (8 - ip.length + blanks) * 2;
+  var b = util.createBuffer();
+  for(var i = 0; i < 8; ++i) {
+    if(!ip[i] || ip[i].length === 0) {
+      b.fillWithByte(0, zeros);
+      zeros = 0;
+      continue;
+    }
+    var bytes = util.hexToBytes(ip[i]);
+    if(bytes.length < 2) {
+      b.putByte(0);
+    }
+    b.putBytes(bytes);
+  }
+  return b.getBytes();
+};
+
+/**
+ * Converts 4-bytes into an IPv4 string representation or 16-bytes into
+ * an IPv6 string representation. The bytes must be in network order.
+ *
+ * @param bytes the bytes to convert.
+ *
+ * @return the IPv4 or IPv6 string representation if 4 or 16 bytes,
+ *         respectively, are given, otherwise null.
+ */
+util.bytesToIP = function(bytes) {
+  if(bytes.length === 4) {
+    return util.bytesToIPv4(bytes);
+  }
+  if(bytes.length === 16) {
+    return util.bytesToIPv6(bytes);
+  }
+  return null;
+};
+
+/**
+ * Converts 4-bytes into an IPv4 string representation. The bytes must be
+ * in network order.
+ *
+ * @param bytes the bytes to convert.
+ *
+ * @return the IPv4 string representation or null for an invalid # of bytes.
+ */
+util.bytesToIPv4 = function(bytes) {
+  if(bytes.length !== 4) {
+    return null;
+  }
+  var ip = [];
+  for(var i = 0; i < bytes.length; ++i) {
+    ip.push(bytes.charCodeAt(i));
+  }
+  return ip.join('.');
+};
+
+/**
+ * Converts 16-bytes into an IPv16 string representation. The bytes must be
+ * in network order.
+ *
+ * @param bytes the bytes to convert.
+ *
+ * @return the IPv16 string representation or null for an invalid # of bytes.
+ */
+util.bytesToIPv6 = function(bytes) {
+  if(bytes.length !== 16) {
+    return null;
+  }
+  var ip = [];
+  var zeroGroups = [];
+  var zeroMaxGroup = 0;
+  for(var i = 0; i < bytes.length; i += 2) {
+    var hex = util.bytesToHex(bytes[i] + bytes[i + 1]);
+    // canonicalize zero representation
+    while(hex[0] === '0' && hex !== '0') {
+      hex = hex.substr(1);
+    }
+    if(hex === '0') {
+      var last = zeroGroups[zeroGroups.length - 1];
+      var idx = ip.length;
+      if(!last || idx !== last.end + 1) {
+        zeroGroups.push({start: idx, end: idx});
+      } else {
+        last.end = idx;
+        if((last.end - last.start) >
+          (zeroGroups[zeroMaxGroup].end - zeroGroups[zeroMaxGroup].start)) {
+          zeroMaxGroup = zeroGroups.length - 1;
+        }
+      }
+    }
+    ip.push(hex);
+  }
+  if(zeroGroups.length > 0) {
+    var group = zeroGroups[zeroMaxGroup];
+    // only shorten group of length > 0
+    if(group.end - group.start > 0) {
+      ip.splice(group.start, group.end - group.start + 1, '');
+      if(group.start === 0) {
+        ip.unshift('');
+      }
+      if(group.end === 7) {
+        ip.push('');
+      }
+    }
+  }
+  return ip.join(':');
+};
+
+/**
+ * Estimates the number of processes that can be run concurrently. If
+ * creating Web Workers, keep in mind that the main JavaScript process needs
+ * its own core.
+ *
+ * @param options the options to use:
+ *          update true to force an update (not use the cached value).
+ * @param callback(err, max) called once the operation completes.
+ */
+util.estimateCores = function(options, callback) {
+  if(typeof options === 'function') {
+    callback = options;
+    options = {};
+  }
+  options = options || {};
+  if('cores' in util && !options.update) {
+    return callback(null, util.cores);
+  }
+  if(typeof navigator !== 'undefined' &&
+    'hardwareConcurrency' in navigator &&
+    navigator.hardwareConcurrency > 0) {
+    util.cores = navigator.hardwareConcurrency;
+    return callback(null, util.cores);
+  }
+  if(typeof Worker === 'undefined') {
+    // workers not available
+    util.cores = 1;
+    return callback(null, util.cores);
+  }
+  if(typeof Blob === 'undefined') {
+    // can't estimate, default to 2
+    util.cores = 2;
+    return callback(null, util.cores);
+  }
+
+  // create worker concurrency estimation code as blob
+  var blobUrl = URL.createObjectURL(new Blob(['(',
+    function() {
+      self.addEventListener('message', function(e) {
+        // run worker for 4 ms
+        var st = Date.now();
+        var et = st + 4;
+        while(Date.now() < et);
+        self.postMessage({st: st, et: et});
+      });
+    }.toString(),
+  ')()'], {type: 'application/javascript'}));
+
+  // take 5 samples using 16 workers
+  sample([], 5, 16);
+
+  function sample(max, samples, numWorkers) {
+    if(samples === 0) {
+      // get overlap average
+      var avg = Math.floor(max.reduce(function(avg, x) {
+        return avg + x;
+      }, 0) / max.length);
+      util.cores = Math.max(1, avg);
+      URL.revokeObjectURL(blobUrl);
+      return callback(null, util.cores);
+    }
+    map(numWorkers, function(err, results) {
+      max.push(reduce(numWorkers, results));
+      sample(max, samples - 1, numWorkers);
+    });
+  }
+
+  function map(numWorkers, callback) {
+    var workers = [];
+    var results = [];
+    for(var i = 0; i < numWorkers; ++i) {
+      var worker = new Worker(blobUrl);
+      worker.addEventListener('message', function(e) {
+        results.push(e.data);
+        if(results.length === numWorkers) {
+          for(var i = 0; i < numWorkers; ++i) {
+            workers[i].terminate();
+          }
+          callback(null, results);
+        }
+      });
+      workers.push(worker);
+    }
+    for(var i = 0; i < numWorkers; ++i) {
+      workers[i].postMessage(i);
+    }
+  }
+
+  function reduce(numWorkers, results) {
+    // find overlapping time windows
+    var overlaps = [];
+    for(var n = 0; n < numWorkers; ++n) {
+      var r1 = results[n];
+      var overlap = overlaps[n] = [];
+      for(var i = 0; i < numWorkers; ++i) {
+        if(n === i) {
+          continue;
+        }
+        var r2 = results[i];
+        if((r1.st > r2.st && r1.st < r2.et) ||
+          (r2.st > r1.st && r2.st < r1.et)) {
+          overlap.push(i);
+        }
+      }
+    }
+    // get maximum overlaps ... don't include overlapping worker itself
+    // as the main JS process was also being scheduled during the work and
+    // would have to be subtracted from the estimate anyway
+    return overlaps.reduce(function(max, overlap) {
+      return Math.max(max, overlap.length);
+    }, 0);
+  }
+};
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              /*
+ *
+ * Copyright 2016 gRPC authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+#include <grpc/support/port_platform.h>
+
+#include "src/core/lib/channel/handshaker_registry.h"
+#include "src/core/lib/gprpp/inlined_vector.h"
+#include "src/core/lib/gprpp/memory.h"
+
+#include <string.h>
+#include <algorithm>
+
+#include <grpc/support/alloc.h>
+
+//
+// grpc_handshaker_factory_list
+//
+
+namespace grpc_core {
+
+namespace {
+
+class HandshakerFactoryList {
+ public:
+  void Register(bool at_start, UniquePtr<HandshakerFactory> factory);
+  void AddHandshakers(const grpc_channel_args* args,
+                      grpc_pollset_set* interested_parties,
+                      HandshakeManager* handshake_mgr);
+
+ private:
+  InlinedVector<UniquePtr<HandshakerFactory>, 2> factories_;
+};
+
+HandshakerFactoryList* g_handshaker_factory_lists = nullptr;
+
+}  // namespace
+
+void Handsh

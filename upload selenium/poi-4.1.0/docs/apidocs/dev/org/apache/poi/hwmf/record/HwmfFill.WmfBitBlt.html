@@ -1,0 +1,255 @@
+age = symbolAccessibilityResult.errorModuleName ?
+                        ts.Diagnostics.Return_type_of_call_signature_from_exported_interface_has_or_is_using_name_0_from_private_module_1 :
+                        ts.Diagnostics.Return_type_of_call_signature_from_exported_interface_has_or_is_using_private_name_0;
+                    break;
+                case 162:
+                    diagnosticMessage = symbolAccessibilityResult.errorModuleName ?
+                        ts.Diagnostics.Return_type_of_index_signature_from_exported_interface_has_or_is_using_name_0_from_private_module_1 :
+                        ts.Diagnostics.Return_type_of_index_signature_from_exported_interface_has_or_is_using_private_name_0;
+                    break;
+                case 156:
+                case 155:
+                    if (ts.hasModifier(node, 32)) {
+                        diagnosticMessage = symbolAccessibilityResult.errorModuleName ?
+                            symbolAccessibilityResult.accessibility === 2 ?
+                                ts.Diagnostics.Return_type_of_public_static_method_from_exported_class_has_or_is_using_name_0_from_external_module_1_but_cannot_be_named :
+                                ts.Diagnostics.Return_type_of_public_static_method_from_exported_class_has_or_is_using_name_0_from_private_module_1 :
+                            ts.Diagnostics.Return_type_of_public_static_method_from_exported_class_has_or_is_using_private_name_0;
+                    }
+                    else if (node.parent.kind === 240) {
+                        diagnosticMessage = symbolAccessibilityResult.errorModuleName ?
+                            symbolAccessibilityResult.accessibility === 2 ?
+                                ts.Diagnostics.Return_type_of_public_method_from_exported_class_has_or_is_using_name_0_from_external_module_1_but_cannot_be_named :
+                                ts.Diagnostics.Return_type_of_public_method_from_exported_class_has_or_is_using_name_0_from_private_module_1 :
+                            ts.Diagnostics.Return_type_of_public_method_from_exported_class_has_or_is_using_private_name_0;
+                    }
+                    else {
+                        diagnosticMessage = symbolAccessibilityResult.errorModuleName ?
+                            ts.Diagnostics.Return_type_of_method_from_exported_interface_has_or_is_using_name_0_from_private_module_1 :
+                            ts.Diagnostics.Return_type_of_method_from_exported_interface_has_or_is_using_private_name_0;
+                    }
+                    break;
+                case 239:
+                    diagnosticMessage = symbolAccessibilityResult.errorModuleName ?
+                        symbolAccessibilityResult.accessibility === 2 ?
+                            ts.Diagnostics.Return_type_of_exported_function_has_or_is_using_name_0_from_external_module_1_but_cannot_be_named :
+                            ts.Diagnostics.Return_type_of_exported_function_has_or_is_using_name_0_from_private_module_1 :
+                        ts.Diagnostics.Return_type_of_exported_function_has_or_is_using_private_name_0;
+                    break;
+                default:
+                    return ts.Debug.fail("This is unknown kind for signature: " + node.kind);
+            }
+            return {
+                diagnosticMessage: diagnosticMessage,
+                errorNode: node.name || node
+            };
+        }
+        function getParameterDeclarationTypeVisibilityError(symbolAccessibilityResult) {
+            var diagnosticMessage = getParameterDeclarationTypeVisibilityDiagnosticMessage(symbolAccessibilityResult);
+            return diagnosticMessage !== undefined ? {
+                diagnosticMessage: diagnosticMessage,
+                errorNode: node,
+                typeName: node.name
+            } : undefined;
+        }
+        function getParameterDeclarationTypeVisibilityDiagnosticMessage(symbolAccessibilityResult) {
+            switch (node.parent.kind) {
+                case 157:
+                    return symbolAccessibilityResult.errorModuleName ?
+                        symbolAccessibilityResult.accessibility === 2 ?
+                            ts.Diagnostics.Parameter_0_of_constructor_from_exported_class_has_or_is_using_name_1_from_external_module_2_but_cannot_be_named :
+                            ts.Diagnostics.Parameter_0_of_constructor_from_exported_class_has_or_is_using_name_1_from_private_module_2 :
+                        ts.Diagnostics.Parameter_0_of_constructor_from_exported_class_has_or_is_using_private_name_1;
+                case 161:
+                case 166:
+                    return symbolAccessibilityResult.errorModuleName ?
+                        ts.Diagnostics.Parameter_0_of_constructor_signature_from_exported_interface_has_or_is_using_name_1_from_private_module_2 :
+                        ts.Diagnostics.Parameter_0_of_constructor_signature_from_exported_interface_has_or_is_using_private_name_1;
+                case 160:
+                    return symbolAccessibilityResult.errorModuleName ?
+                        ts.Diagnostics.Parameter_0_of_call_signature_from_exported_interface_has_or_is_using_name_1_from_private_module_2 :
+                        ts.Diagnostics.Parameter_0_of_call_signature_from_exported_interface_has_or_is_using_private_name_1;
+                case 162:
+                    return symbolAccessibilityResult.errorModuleName ?
+                        ts.Diagnostics.Parameter_0_of_index_signature_from_exported_interface_has_or_is_using_name_1_from_private_module_2 :
+                        ts.Diagnostics.Parameter_0_of_index_signature_from_exported_interface_has_or_is_using_private_name_1;
+                case 156:
+                case 155:
+                    if (ts.hasModifier(node.parent, 32)) {
+                        return symbolAccessibilityResult.errorModuleName ?
+                            symbolAccessibilityResult.accessibility === 2 ?
+                                ts.Diagnostics.Parameter_0_of_public_static_method_from_exported_class_has_or_is_using_name_1_from_external_module_2_but_cannot_be_named :
+                                ts.Diagnostics.Parameter_0_of_public_static_method_from_exported_class_has_or_is_using_name_1_from_private_module_2 :
+                            ts.Diagnostics.Parameter_0_of_public_static_method_from_exported_class_has_or_is_using_private_name_1;
+                    }
+                    else if (node.parent.parent.kind === 240) {
+                        return symbolAccessibilityResult.errorModuleName ?
+                            symbolAccessibilityResult.accessibility === 2 ?
+                                ts.Diagnostics.Parameter_0_of_public_method_from_exported_class_has_or_is_using_name_1_from_external_module_2_but_cannot_be_named :
+                                ts.Diagnostics.Parameter_0_of_public_method_from_exported_class_has_or_is_using_name_1_from_private_module_2 :
+                            ts.Diagnostics.Parameter_0_of_public_method_from_exported_class_has_or_is_using_private_name_1;
+                    }
+                    else {
+                        return symbolAccessibilityResult.errorModuleName ?
+                            ts.Diagnostics.Parameter_0_of_method_from_exported_interface_has_or_is_using_name_1_from_private_module_2 :
+                            ts.Diagnostics.Parameter_0_of_method_from_exported_interface_has_or_is_using_private_name_1;
+                    }
+                case 239:
+                case 165:
+                    return symbolAccessibilityResult.errorModuleName ?
+                        symbolAccessibilityResult.accessibility === 2 ?
+                            ts.Diagnostics.Parameter_0_of_exported_function_has_or_is_using_name_1_from_external_module_2_but_cannot_be_named :
+                            ts.Diagnostics.Parameter_0_of_exported_function_has_or_is_using_name_1_from_private_module_2 :
+                        ts.Diagnostics.Parameter_0_of_exported_function_has_or_is_using_private_name_1;
+                default:
+                    return ts.Debug.fail("Unknown parent for parameter: " + ts.SyntaxKind[node.parent.kind]);
+            }
+        }
+        function getTypeParameterConstraintVisibilityError() {
+            var diagnosticMessage;
+            switch (node.parent.kind) {
+                case 240:
+                    diagnosticMessage = ts.Diagnostics.Type_parameter_0_of_exported_class_has_or_is_using_private_name_1;
+                    break;
+                case 241:
+                    diagnosticMessage = ts.Diagnostics.Type_parameter_0_of_exported_interface_has_or_is_using_private_name_1;
+                    break;
+                case 161:
+                    diagnosticMessage = ts.Diagnostics.Type_parameter_0_of_constructor_signature_from_exported_interface_has_or_is_using_private_name_1;
+                    break;
+                case 160:
+                    diagnosticMessage = ts.Diagnostics.Type_parameter_0_of_call_signature_from_exported_interface_has_or_is_using_private_name_1;
+                    break;
+                case 156:
+                case 155:
+                    if (ts.hasModifier(node.parent, 32)) {
+                        diagnosticMessage = ts.Diagnostics.Type_parameter_0_of_public_static_method_from_exported_class_has_or_is_using_private_name_1;
+                    }
+                    else if (node.parent.parent.kind === 240) {
+                        diagnosticMessage = ts.Diagnostics.Type_parameter_0_of_public_method_from_exported_class_has_or_is_using_private_name_1;
+                    }
+                    else {
+                        diagnosticMessage = ts.Diagnostics.Type_parameter_0_of_method_from_exported_interface_has_or_is_using_private_name_1;
+                    }
+                    break;
+                case 239:
+                    diagnosticMessage = ts.Diagnostics.Type_parameter_0_of_exported_function_has_or_is_using_private_name_1;
+                    break;
+                case 242:
+                    diagnosticMessage = ts.Diagnostics.Type_parameter_0_of_exported_type_alias_has_or_is_using_private_name_1;
+                    break;
+                default:
+                    return ts.Debug.fail("This is unknown parent for type parameter: " + node.parent.kind);
+            }
+            return {
+                diagnosticMessage: diagnosticMessage,
+                errorNode: node,
+                typeName: node.name
+            };
+        }
+        function getHeritageClauseVisibilityError() {
+            var diagnosticMessage;
+            if (node.parent.parent.kind === 240) {
+                diagnosticMessage = ts.isHeritageClause(node.parent) && node.parent.token === 109 ?
+                    ts.Diagnostics.Implements_clause_of_exported_class_0_has_or_is_using_private_name_1 :
+                    ts.Diagnostics.extends_clause_of_exported_class_0_has_or_is_using_private_name_1;
+            }
+            else {
+                diagnosticMessage = ts.Diagnostics.extends_clause_of_exported_interface_0_has_or_is_using_private_name_1;
+            }
+            return {
+                diagnosticMessage: diagnosticMessage,
+                errorNode: node,
+                typeName: ts.getNameOfDeclaration(node.parent.parent)
+            };
+        }
+        function getImportEntityNameVisibilityError() {
+            return {
+                diagnosticMessage: ts.Diagnostics.Import_declaration_0_is_using_private_name_1,
+                errorNode: node,
+                typeName: node.name
+            };
+        }
+        function getTypeAliasDeclarationVisibilityError() {
+            return {
+                diagnosticMessage: ts.Diagnostics.Exported_type_alias_0_has_or_is_using_private_name_1,
+                errorNode: node.type,
+                typeName: node.name
+            };
+        }
+    }
+    ts.createGetSymbolAccessibilityDiagnosticForNode = createGetSymbolAccessibilityDiagnosticForNode;
+})(ts || (ts = {}));
+var ts;
+(function (ts) {
+    function getDeclarationDiagnostics(host, resolver, file) {
+        if (file && ts.isSourceFileJS(file)) {
+            return [];
+        }
+        var compilerOptions = host.getCompilerOptions();
+        var result = ts.transformNodes(resolver, host, compilerOptions, file ? [file] : ts.filter(host.getSourceFiles(), ts.isSourceFileNotJS), [transformDeclarations], false);
+        return result.diagnostics;
+    }
+    ts.getDeclarationDiagnostics = getDeclarationDiagnostics;
+    var declarationEmitNodeBuilderFlags = 1024 |
+        2048 |
+        4096 |
+        8 |
+        524288 |
+        4 |
+        1;
+    function transformDeclarations(context) {
+        var throwDiagnostic = function () { return ts.Debug.fail("Diagnostic emitted without context"); };
+        var getSymbolAccessibilityDiagnostic = throwDiagnostic;
+        var needsDeclare = true;
+        var isBundledEmit = false;
+        var resultHasExternalModuleIndicator = false;
+        var needsScopeFixMarker = false;
+        var resultHasScopeMarker = false;
+        var enclosingDeclaration;
+        var necessaryTypeReferences;
+        var lateMarkedStatements;
+        var lateStatementReplacementMap;
+        var suppressNewDiagnosticContexts;
+        var exportedModulesFromDeclarationEmit;
+        var host = context.getEmitHost();
+        var symbolTracker = {
+            trackSymbol: trackSymbol,
+            reportInaccessibleThisError: reportInaccessibleThisError,
+            reportInaccessibleUniqueSymbolError: reportInaccessibleUniqueSymbolError,
+            reportPrivateInBaseOfClassExpression: reportPrivateInBaseOfClassExpression,
+            reportLikelyUnsafeImportRequiredError: reportLikelyUnsafeImportRequiredError,
+            moduleResolverHost: host,
+            trackReferencedAmbientModule: trackReferencedAmbientModule,
+            trackExternalModuleSymbolOfImportTypeNode: trackExternalModuleSymbolOfImportTypeNode
+        };
+        var errorNameNode;
+        var currentSourceFile;
+        var refs;
+        var libs;
+        var resolver = context.getEmitResolver();
+        var options = context.getCompilerOptions();
+        var newLine = ts.getNewLineCharacter(options);
+        var noResolve = options.noResolve, stripInternal = options.stripInternal;
+        return transformRoot;
+        function recordTypeReferenceDirectivesIfNecessary(typeReferenceDirectives) {
+            if (!typeReferenceDirectives) {
+                return;
+            }
+            necessaryTypeReferences = necessaryTypeReferences || ts.createMap();
+            for (var _i = 0, typeReferenceDirectives_2 = typeReferenceDirectives; _i < typeReferenceDirectives_2.length; _i++) {
+                var ref = typeReferenceDirectives_2[_i];
+                necessaryTypeReferences.set(ref, true);
+            }
+        }
+        function trackReferencedAmbientModule(node, symbol) {
+            var directives = resolver.getTypeReferenceDirectivesForSymbol(symbol, 67108863);
+            if (ts.length(directives)) {
+                return recordTypeReferenceDirectivesIfNecessary(directives);
+            }
+            var container = ts.getSourceFileOfNode(node);
+            refs.set("" + ts.getOriginalNodeId(container), container);
+        }
+        function handleSymbolAccessibilityError(symbolAccessibilityResult) {
+            if (symbolAccessibilityResult.accessibility === 0) {
+    

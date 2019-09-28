@@ -1,0 +1,458 @@
+          return transformAndEmitForInStatement(node);
+                case 228:
+                    return transformAndEmitContinueStatement(node);
+                case 229:
+                    return transformAndEmitBreakStatement(node);
+                case 230:
+                    return transformAndEmitReturnStatement(node);
+                case 231:
+                    return transformAndEmitWithStatement(node);
+                case 232:
+                    return transformAndEmitSwitchStatement(node);
+                case 233:
+                    return transformAndEmitLabeledStatement(node);
+                case 234:
+                    return transformAndEmitThrowStatement(node);
+                case 235:
+                    return transformAndEmitTryStatement(node);
+                default:
+                    return emitStatement(ts.visitNode(node, visitor, ts.isStatement));
+            }
+        }
+        function transformAndEmitBlock(node) {
+            if (containsYield(node)) {
+                transformAndEmitStatements(node.statements);
+            }
+            else {
+                emitStatement(ts.visitNode(node, visitor, ts.isStatement));
+            }
+        }
+        function transformAndEmitExpressionStatement(node) {
+            emitStatement(ts.visitNode(node, visitor, ts.isStatement));
+        }
+        function transformAndEmitVariableDeclarationList(node) {
+            for (var _i = 0, _a = node.declarations; _i < _a.length; _i++) {
+                var variable = _a[_i];
+                var name = ts.getSynthesizedClone(variable.name);
+                ts.setCommentRange(name, variable.name);
+                hoistVariableDeclaration(name);
+            }
+            var variables = ts.getInitializedVariables(node);
+            var numVariables = variables.length;
+            var variablesWritten = 0;
+            var pendingExpressions = [];
+            while (variablesWritten < numVariables) {
+                for (var i = variablesWritten; i < numVariables; i++) {
+                    var variable = variables[i];
+                    if (containsYield(variable.initializer) && pendingExpressions.length > 0) {
+                        break;
+                    }
+                    pendingExpressions.push(transformInitializedVariable(variable));
+                }
+                if (pendingExpressions.length) {
+                    emitStatement(ts.createExpressionStatement(ts.inlineExpressions(pendingExpressions)));
+                    variablesWritten += pendingExpressions.length;
+                    pendingExpressions = [];
+                }
+            }
+            return undefined;
+        }
+        function transformInitializedVariable(node) {
+            return ts.setSourceMapRange(ts.createAssignment(ts.setSourceMapRange(ts.getSynthesizedClone(node.name), node.name), ts.visitNode(node.initializer, visitor, ts.isExpression)), node);
+        }
+        function transformAndEmitIfStatement(node) {
+            if (containsYield(node)) {
+                if (containsYield(node.thenStatement) || containsYield(node.elseStatement)) {
+                    var endLabel = defineLabel();
+                    var elseLabel = node.elseStatement ? defineLabel() : undefined;
+                    emitBreakWhenFalse(node.elseStatement ? elseLabel : endLabel, ts.visitNode(node.expression, visitor, ts.isExpression), node.expression);
+                    transformAndEmitEmbeddedStatement(node.thenStatement);
+                    if (node.elseStatement) {
+                        emitBreak(endLabel);
+                        markLabel(elseLabel);
+                        transformAndEmitEmbeddedStatement(node.elseStatement);
+                    }
+                    markLabel(endLabel);
+                }
+                else {
+                    emitStatement(ts.visitNode(node, visitor, ts.isStatement));
+                }
+            }
+            else {
+                emitStatement(ts.visitNode(node, visitor, ts.isStatement));
+            }
+        }
+        function transformAndEmitDoStatement(node) {
+            if (containsYield(node)) {
+                var conditionLabel = defineLabel();
+                var loopLabel = defineLabel();
+                beginLoopBlock(conditionLabel);
+                markLabel(loopLabel);
+                transformAndEmitEmbeddedStatement(node.statement);
+                markLabel(conditionLabel);
+                emitBreakWhenTrue(loopLabel, ts.visitNode(node.expression, visitor, ts.isExpression));
+                endLoopBlock();
+            }
+            else {
+                emitStatement(ts.visitNode(node, visitor, ts.isStatement));
+            }
+        }
+        function visitDoStatement(node) {
+            if (inStatementContainingYield) {
+                beginScriptLoopBlock();
+                node = ts.visitEachChild(node, visitor, context);
+                endLoopBlock();
+                return node;
+            }
+            else {
+                return ts.visitEachChild(node, visitor, context);
+            }
+        }
+        function transformAndEmitWhileStatement(node) {
+            if (containsYield(node)) {
+                var loopLabel = defineLabel();
+                var endLabel = beginLoopBlock(loopLabel);
+                markLabel(loopLabel);
+                emitBreakWhenFalse(endLabel, ts.visitNode(node.expression, visitor, ts.isExpression));
+                transformAndEmitEmbeddedStatement(node.statement);
+                emitBreak(loopLabel);
+                endLoopBlock();
+            }
+            else {
+                emitStatement(ts.visitNode(node, visitor, ts.isStatement));
+            }
+        }
+        function visitWhileStatement(node) {
+            if (inStatementContainingYield) {
+                beginScriptLoopBlock();
+                node = ts.visitEachChild(node, visitor, context);
+                endLoopBlock();
+                return node;
+            }
+            else {
+                return ts.visitEachChild(node, visitor, context);
+            }
+        }
+        function transformAndEmitForStatement(node) {
+            if (containsYield(node)) {
+                var conditionLabel = defineLabel();
+                var incrementLabel = defineLabel();
+                var endLabel = beginLoopBlock(incrementLabel);
+                if (node.initializer) {
+                    var initializer = node.initializer;
+                    if (ts.isVariableDeclarationList(initializer)) {
+                        transformAndEmitVariableDeclarationList(initializer);
+                    }
+                    else {
+                        emitStatement(ts.setTextRange(ts.createExpressionStatement(ts.visitNode(initializer, visitor, ts.isExpression)), initializer));
+                    }
+                }
+                markLabel(conditionLabel);
+                if (node.condition) {
+                    emitBreakWhenFalse(endLabel, ts.visitNode(node.condition, visitor, ts.isExpression));
+                }
+                transformAndEmitEmbeddedStatement(node.statement);
+                markLabel(incrementLabel);
+                if (node.incrementor) {
+                    emitStatement(ts.setTextRange(ts.createExpressionStatement(ts.visitNode(node.incrementor, visitor, ts.isExpression)), node.incrementor));
+                }
+                emitBreak(conditionLabel);
+                endLoopBlock();
+            }
+            else {
+                emitStatement(ts.visitNode(node, visitor, ts.isStatement));
+            }
+        }
+        function visitForStatement(node) {
+            if (inStatementContainingYield) {
+                beginScriptLoopBlock();
+            }
+            var initializer = node.initializer;
+            if (initializer && ts.isVariableDeclarationList(initializer)) {
+                for (var _i = 0, _a = initializer.declarations; _i < _a.length; _i++) {
+                    var variable = _a[_i];
+                    hoistVariableDeclaration(variable.name);
+                }
+                var variables = ts.getInitializedVariables(initializer);
+                node = ts.updateFor(node, variables.length > 0
+                    ? ts.inlineExpressions(ts.map(variables, transformInitializedVariable))
+                    : undefined, ts.visitNode(node.condition, visitor, ts.isExpression), ts.visitNode(node.incrementor, visitor, ts.isExpression), ts.visitNode(node.statement, visitor, ts.isStatement, ts.liftToBlock));
+            }
+            else {
+                node = ts.visitEachChild(node, visitor, context);
+            }
+            if (inStatementContainingYield) {
+                endLoopBlock();
+            }
+            return node;
+        }
+        function transformAndEmitForInStatement(node) {
+            if (containsYield(node)) {
+                var keysArray = declareLocal();
+                var key = declareLocal();
+                var keysIndex = ts.createLoopVariable();
+                var initializer = node.initializer;
+                hoistVariableDeclaration(keysIndex);
+                emitAssignment(keysArray, ts.createArrayLiteral());
+                emitStatement(ts.createForIn(key, ts.visitNode(node.expression, visitor, ts.isExpression), ts.createExpressionStatement(ts.createCall(ts.createPropertyAccess(keysArray, "push"), undefined, [key]))));
+                emitAssignment(keysIndex, ts.createLiteral(0));
+                var conditionLabel = defineLabel();
+                var incrementLabel = defineLabel();
+                var endLabel = beginLoopBlock(incrementLabel);
+                markLabel(conditionLabel);
+                emitBreakWhenFalse(endLabel, ts.createLessThan(keysIndex, ts.createPropertyAccess(keysArray, "length")));
+                var variable = void 0;
+                if (ts.isVariableDeclarationList(initializer)) {
+                    for (var _i = 0, _a = initializer.declarations; _i < _a.length; _i++) {
+                        var variable_1 = _a[_i];
+                        hoistVariableDeclaration(variable_1.name);
+                    }
+                    variable = ts.getSynthesizedClone(initializer.declarations[0].name);
+                }
+                else {
+                    variable = ts.visitNode(initializer, visitor, ts.isExpression);
+                    ts.Debug.assert(ts.isLeftHandSideExpression(variable));
+                }
+                emitAssignment(variable, ts.createElementAccess(keysArray, keysIndex));
+                transformAndEmitEmbeddedStatement(node.statement);
+                markLabel(incrementLabel);
+                emitStatement(ts.createExpressionStatement(ts.createPostfixIncrement(keysIndex)));
+                emitBreak(conditionLabel);
+                endLoopBlock();
+            }
+            else {
+                emitStatement(ts.visitNode(node, visitor, ts.isStatement));
+            }
+        }
+        function visitForInStatement(node) {
+            if (inStatementContainingYield) {
+                beginScriptLoopBlock();
+            }
+            var initializer = node.initializer;
+            if (ts.isVariableDeclarationList(initializer)) {
+                for (var _i = 0, _a = initializer.declarations; _i < _a.length; _i++) {
+                    var variable = _a[_i];
+                    hoistVariableDeclaration(variable.name);
+                }
+                node = ts.updateForIn(node, initializer.declarations[0].name, ts.visitNode(node.expression, visitor, ts.isExpression), ts.visitNode(node.statement, visitor, ts.isStatement, ts.liftToBlock));
+            }
+            else {
+                node = ts.visitEachChild(node, visitor, context);
+            }
+            if (inStatementContainingYield) {
+                endLoopBlock();
+            }
+            return node;
+        }
+        function transformAndEmitContinueStatement(node) {
+            var label = findContinueTarget(node.label ? ts.idText(node.label) : undefined);
+            if (label > 0) {
+                emitBreak(label, node);
+            }
+            else {
+                emitStatement(node);
+            }
+        }
+        function visitContinueStatement(node) {
+            if (inStatementContainingYield) {
+                var label = findContinueTarget(node.label && ts.idText(node.label));
+                if (label > 0) {
+                    return createInlineBreak(label, node);
+                }
+            }
+            return ts.visitEachChild(node, visitor, context);
+        }
+        function transformAndEmitBreakStatement(node) {
+            var label = findBreakTarget(node.label ? ts.idText(node.label) : undefined);
+            if (label > 0) {
+                emitBreak(label, node);
+            }
+            else {
+                emitStatement(node);
+            }
+        }
+        function visitBreakStatement(node) {
+            if (inStatementContainingYield) {
+                var label = findBreakTarget(node.label && ts.idText(node.label));
+                if (label > 0) {
+                    return createInlineBreak(label, node);
+                }
+            }
+            return ts.visitEachChild(node, visitor, context);
+        }
+        function transformAndEmitReturnStatement(node) {
+            emitReturn(ts.visitNode(node.expression, visitor, ts.isExpression), node);
+        }
+        function visitReturnStatement(node) {
+            return createInlineReturn(ts.visitNode(node.expression, visitor, ts.isExpression), node);
+        }
+        function transformAndEmitWithStatement(node) {
+            if (containsYield(node)) {
+                beginWithBlock(cacheExpression(ts.visitNode(node.expression, visitor, ts.isExpression)));
+                transformAndEmitEmbeddedStatement(node.statement);
+                endWithBlock();
+            }
+            else {
+                emitStatement(ts.visitNode(node, visitor, ts.isStatement));
+            }
+        }
+        function transformAndEmitSwitchStatement(node) {
+            if (containsYield(node.caseBlock)) {
+                var caseBlock = node.caseBlock;
+                var numClauses = caseBlock.clauses.length;
+                var endLabel = beginSwitchBlock();
+                var expression = cacheExpression(ts.visitNode(node.expression, visitor, ts.isExpression));
+                var clauseLabels = [];
+                var defaultClauseIndex = -1;
+                for (var i = 0; i < numClauses; i++) {
+                    var clause = caseBlock.clauses[i];
+                    clauseLabels.push(defineLabel());
+                    if (clause.kind === 272 && defaultClauseIndex === -1) {
+                        defaultClauseIndex = i;
+                    }
+                }
+                var clausesWritten = 0;
+                var pendingClauses = [];
+                while (clausesWritten < numClauses) {
+                    var defaultClausesSkipped = 0;
+                    for (var i = clausesWritten; i < numClauses; i++) {
+                        var clause = caseBlock.clauses[i];
+                        if (clause.kind === 271) {
+                            if (containsYield(clause.expression) && pendingClauses.length > 0) {
+                                break;
+                            }
+                            pendingClauses.push(ts.createCaseClause(ts.visitNode(clause.expression, visitor, ts.isExpression), [
+                                createInlineBreak(clauseLabels[i], clause.expression)
+                            ]));
+                        }
+                        else {
+                            defaultClausesSkipped++;
+                        }
+                    }
+                    if (pendingClauses.length) {
+                        emitStatement(ts.createSwitch(expression, ts.createCaseBlock(pendingClauses)));
+                        clausesWritten += pendingClauses.length;
+                        pendingClauses = [];
+                    }
+                    if (defaultClausesSkipped > 0) {
+                        clausesWritten += defaultClausesSkipped;
+                        defaultClausesSkipped = 0;
+                    }
+                }
+                if (defaultClauseIndex >= 0) {
+                    emitBreak(clauseLabels[defaultClauseIndex]);
+                }
+                else {
+                    emitBreak(endLabel);
+                }
+                for (var i = 0; i < numClauses; i++) {
+                    markLabel(clauseLabels[i]);
+                    transformAndEmitStatements(caseBlock.clauses[i].statements);
+                }
+                endSwitchBlock();
+            }
+            else {
+                emitStatement(ts.visitNode(node, visitor, ts.isStatement));
+            }
+        }
+        function visitSwitchStatement(node) {
+            if (inStatementContainingYield) {
+                beginScriptSwitchBlock();
+            }
+            node = ts.visitEachChild(node, visitor, context);
+            if (inStatementContainingYield) {
+                endSwitchBlock();
+            }
+            return node;
+        }
+        function transformAndEmitLabeledStatement(node) {
+            if (containsYield(node)) {
+                beginLabeledBlock(ts.idText(node.label));
+                transformAndEmitEmbeddedStatement(node.statement);
+                endLabeledBlock();
+            }
+            else {
+                emitStatement(ts.visitNode(node, visitor, ts.isStatement));
+            }
+        }
+        function visitLabeledStatement(node) {
+            if (inStatementContainingYield) {
+                beginScriptLabeledBlock(ts.idText(node.label));
+            }
+            node = ts.visitEachChild(node, visitor, context);
+            if (inStatementContainingYield) {
+                endLabeledBlock();
+            }
+            return node;
+        }
+        function transformAndEmitThrowStatement(node) {
+            emitThrow(ts.visitNode(node.expression, visitor, ts.isExpression), node);
+        }
+        function transformAndEmitTryStatement(node) {
+            if (containsYield(node)) {
+                beginExceptionBlock();
+                transformAndEmitEmbeddedStatement(node.tryBlock);
+                if (node.catchClause) {
+                    beginCatchBlock(node.catchClause.variableDeclaration);
+                    transformAndEmitEmbeddedStatement(node.catchClause.block);
+                }
+                if (node.finallyBlock) {
+                    beginFinallyBlock();
+                    transformAndEmitEmbeddedStatement(node.finallyBlock);
+                }
+                endExceptionBlock();
+            }
+            else {
+                emitStatement(ts.visitEachChild(node, visitor, context));
+            }
+        }
+        function containsYield(node) {
+            return !!node && (node.transformFlags & 4194304) !== 0;
+        }
+        function countInitialNodesWithoutYield(nodes) {
+            var numNodes = nodes.length;
+            for (var i = 0; i < numNodes; i++) {
+                if (containsYield(nodes[i])) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+        function onSubstituteNode(hint, node) {
+            node = previousOnSubstituteNode(hint, node);
+            if (hint === 1) {
+                return substituteExpression(node);
+            }
+            return node;
+        }
+        function substituteExpression(node) {
+            if (ts.isIdentifier(node)) {
+                return substituteExpressionIdentifier(node);
+            }
+            return node;
+        }
+        function substituteExpressionIdentifier(node) {
+            if (!ts.isGeneratedIdentifier(node) && renamedCatchVariables && renamedCatchVariables.has(ts.idText(node))) {
+                var original = ts.getOriginalNode(node);
+                if (ts.isIdentifier(original) && original.parent) {
+                    var declaration = resolver.getReferencedValueDeclaration(original);
+                    if (declaration) {
+                        var name = renamedCatchVariableDeclarations[ts.getOriginalNodeId(declaration)];
+                        if (name) {
+                            var clone_7 = ts.getMutableClone(name);
+                            ts.setSourceMapRange(clone_7, node);
+                            ts.setCommentRange(clone_7, node);
+                            return clone_7;
+                        }
+                    }
+                }
+            }
+            return node;
+        }
+        function cacheExpression(node) {
+            var temp;
+            if (ts.isGeneratedIdentifier(node) || ts.getEmitFlags(node) & 4096) {
+                return node;
+            }
+            temp = ts.createTempVariable(hoistVariableDeclaration);
+            emitAs

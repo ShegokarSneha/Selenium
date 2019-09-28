@@ -1,0 +1,309 @@
+rs, body);
+            }
+            exitSubtree(ancestorFacts, 49152, 0);
+            convertedLoopState = savedConvertedLoopState;
+            return updated;
+        }
+        function visitShorthandPropertyAssignment(node) {
+            return ts.setTextRange(ts.createPropertyAssignment(node.name, ts.getSynthesizedClone(node.name)), node);
+        }
+        function visitComputedPropertyName(node) {
+            var ancestorFacts = enterSubtree(0, 8192);
+            var updated = ts.visitEachChild(node, visitor, context);
+            exitSubtree(ancestorFacts, 49152, hierarchyFacts & 49152 ? 32768 : 0);
+            return updated;
+        }
+        function visitYieldExpression(node) {
+            return ts.visitEachChild(node, visitor, context);
+        }
+        function visitArrayLiteralExpression(node) {
+            if (node.transformFlags & 64) {
+                return transformAndSpreadElements(node.elements, true, !!node.multiLine, !!node.elements.hasTrailingComma);
+            }
+            return ts.visitEachChild(node, visitor, context);
+        }
+        function visitCallExpression(node) {
+            if (ts.getEmitFlags(node) & 33554432) {
+                return visitTypeScriptClassWrapper(node);
+            }
+            if (node.transformFlags & 64) {
+                return visitCallExpressionWithPotentialCapturedThisAssignment(node, true);
+            }
+            return ts.updateCall(node, ts.visitNode(node.expression, callExpressionVisitor, ts.isExpression), undefined, ts.visitNodes(node.arguments, visitor, ts.isExpression));
+        }
+        function visitTypeScriptClassWrapper(node) {
+            var body = ts.cast(ts.cast(ts.skipOuterExpressions(node.expression), ts.isArrowFunction).body, ts.isBlock);
+            var isVariableStatementWithInitializer = function (stmt) { return ts.isVariableStatement(stmt) && !!ts.first(stmt.declarationList.declarations).initializer; };
+            var bodyStatements = ts.visitNodes(body.statements, visitor, ts.isStatement);
+            var classStatements = ts.filter(bodyStatements, isVariableStatementWithInitializer);
+            var remainingStatements = ts.filter(bodyStatements, function (stmt) { return !isVariableStatementWithInitializer(stmt); });
+            var varStatement = ts.cast(ts.first(classStatements), ts.isVariableStatement);
+            var variable = varStatement.declarationList.declarations[0];
+            var initializer = ts.skipOuterExpressions(variable.initializer);
+            var aliasAssignment = ts.tryCast(initializer, ts.isAssignmentExpression);
+            var call = ts.cast(aliasAssignment ? ts.skipOuterExpressions(aliasAssignment.right) : initializer, ts.isCallExpression);
+            var func = ts.cast(ts.skipOuterExpressions(call.expression), ts.isFunctionExpression);
+            var funcStatements = func.body.statements;
+            var classBodyStart = 0;
+            var classBodyEnd = -1;
+            var statements = [];
+            if (aliasAssignment) {
+                var extendsCall = ts.tryCast(funcStatements[classBodyStart], ts.isExpressionStatement);
+                if (extendsCall) {
+                    statements.push(extendsCall);
+                    classBodyStart++;
+                }
+                statements.push(funcStatements[classBodyStart]);
+                classBodyStart++;
+                statements.push(ts.createExpressionStatement(ts.createAssignment(aliasAssignment.left, ts.cast(variable.name, ts.isIdentifier))));
+            }
+            while (!ts.isReturnStatement(ts.elementAt(funcStatements, classBodyEnd))) {
+                classBodyEnd--;
+            }
+            ts.addRange(statements, funcStatements, classBodyStart, classBodyEnd);
+            if (classBodyEnd < -1) {
+                ts.addRange(statements, funcStatements, classBodyEnd + 1);
+            }
+            ts.addRange(statements, remainingStatements);
+            ts.addRange(statements, classStatements, 1);
+            return ts.recreateOuterExpressions(node.expression, ts.recreateOuterExpressions(variable.initializer, ts.recreateOuterExpressions(aliasAssignment && aliasAssignment.right, ts.updateCall(call, ts.recreateOuterExpressions(call.expression, ts.updateFunctionExpression(func, undefined, undefined, undefined, undefined, func.parameters, undefined, ts.updateBlock(func.body, statements))), undefined, call.arguments))));
+        }
+        function visitImmediateSuperCallInBody(node) {
+            return visitCallExpressionWithPotentialCapturedThisAssignment(node, false);
+        }
+        function visitCallExpressionWithPotentialCapturedThisAssignment(node, assignToCapturedThis) {
+            if (node.transformFlags & 131072 ||
+                node.expression.kind === 98 ||
+                ts.isSuperProperty(ts.skipOuterExpressions(node.expression))) {
+                var _a = ts.createCallBinding(node.expression, hoistVariableDeclaration), target = _a.target, thisArg = _a.thisArg;
+                if (node.expression.kind === 98) {
+                    ts.setEmitFlags(thisArg, 4);
+                }
+                var resultingCall = void 0;
+                if (node.transformFlags & 131072) {
+                    resultingCall = ts.createFunctionApply(ts.visitNode(target, callExpressionVisitor, ts.isExpression), ts.visitNode(thisArg, visitor, ts.isExpression), transformAndSpreadElements(node.arguments, false, false, false));
+                }
+                else {
+                    resultingCall = ts.createFunctionCall(ts.visitNode(target, callExpressionVisitor, ts.isExpression), ts.visitNode(thisArg, visitor, ts.isExpression), ts.visitNodes(node.arguments, visitor, ts.isExpression), node);
+                }
+                if (node.expression.kind === 98) {
+                    var actualThis = ts.createThis();
+                    ts.setEmitFlags(actualThis, 4);
+                    var initializer = ts.createLogicalOr(resultingCall, actualThis);
+                    resultingCall = assignToCapturedThis
+                        ? ts.createAssignment(ts.createFileLevelUniqueName("_this"), initializer)
+                        : initializer;
+                }
+                return ts.setOriginalNode(resultingCall, node);
+            }
+            return ts.visitEachChild(node, visitor, context);
+        }
+        function visitNewExpression(node) {
+            if (node.transformFlags & 131072) {
+                var _a = ts.createCallBinding(ts.createPropertyAccess(node.expression, "bind"), hoistVariableDeclaration), target = _a.target, thisArg = _a.thisArg;
+                return ts.createNew(ts.createFunctionApply(ts.visitNode(target, visitor, ts.isExpression), thisArg, transformAndSpreadElements(ts.createNodeArray([ts.createVoidZero()].concat(node.arguments)), false, false, false)), undefined, []);
+            }
+            return ts.visitEachChild(node, visitor, context);
+        }
+        function transformAndSpreadElements(elements, needsUniqueCopy, multiLine, hasTrailingComma) {
+            var numElements = elements.length;
+            var segments = ts.flatten(ts.spanMap(elements, partitionSpread, function (partition, visitPartition, _start, end) {
+                return visitPartition(partition, multiLine, hasTrailingComma && end === numElements);
+            }));
+            if (compilerOptions.downlevelIteration) {
+                if (segments.length === 1) {
+                    var firstSegment = segments[0];
+                    if (ts.isCallExpression(firstSegment)
+                        && ts.isIdentifier(firstSegment.expression)
+                        && (ts.getEmitFlags(firstSegment.expression) & 4096)
+                        && firstSegment.expression.escapedText === "___spread") {
+                        return segments[0];
+                    }
+                }
+                return ts.createSpreadHelper(context, segments);
+            }
+            else {
+                if (segments.length === 1) {
+                    var firstElement = elements[0];
+                    return needsUniqueCopy && ts.isSpreadElement(firstElement) && firstElement.expression.kind !== 187
+                        ? ts.createArraySlice(segments[0])
+                        : segments[0];
+                }
+                return ts.createArrayConcat(segments.shift(), segments);
+            }
+        }
+        function partitionSpread(node) {
+            return ts.isSpreadElement(node)
+                ? visitSpanOfSpreads
+                : visitSpanOfNonSpreads;
+        }
+        function visitSpanOfSpreads(chunk) {
+            return ts.map(chunk, visitExpressionOfSpread);
+        }
+        function visitSpanOfNonSpreads(chunk, multiLine, hasTrailingComma) {
+            return ts.createArrayLiteral(ts.visitNodes(ts.createNodeArray(chunk, hasTrailingComma), visitor, ts.isExpression), multiLine);
+        }
+        function visitSpreadElement(node) {
+            return ts.visitNode(node.expression, visitor, ts.isExpression);
+        }
+        function visitExpressionOfSpread(node) {
+            return ts.visitNode(node.expression, visitor, ts.isExpression);
+        }
+        function visitTemplateLiteral(node) {
+            return ts.setTextRange(ts.createLiteral(node.text), node);
+        }
+        function visitStringLiteral(node) {
+            if (node.hasExtendedUnicodeEscape) {
+                return ts.setTextRange(ts.createLiteral(node.text), node);
+            }
+            return node;
+        }
+        function visitNumericLiteral(node) {
+            if (node.numericLiteralFlags & 384) {
+                return ts.setTextRange(ts.createNumericLiteral(node.text), node);
+            }
+            return node;
+        }
+        function visitTaggedTemplateExpression(node) {
+            var tag = ts.visitNode(node.tag, visitor, ts.isExpression);
+            var templateArguments = [undefined];
+            var cookedStrings = [];
+            var rawStrings = [];
+            var template = node.template;
+            if (ts.isNoSubstitutionTemplateLiteral(template)) {
+                cookedStrings.push(ts.createLiteral(template.text));
+                rawStrings.push(getRawLiteral(template));
+            }
+            else {
+                cookedStrings.push(ts.createLiteral(template.head.text));
+                rawStrings.push(getRawLiteral(template.head));
+                for (var _i = 0, _a = template.templateSpans; _i < _a.length; _i++) {
+                    var templateSpan = _a[_i];
+                    cookedStrings.push(ts.createLiteral(templateSpan.literal.text));
+                    rawStrings.push(getRawLiteral(templateSpan.literal));
+                    templateArguments.push(ts.visitNode(templateSpan.expression, visitor, ts.isExpression));
+                }
+            }
+            var helperCall = createTemplateObjectHelper(context, ts.createArrayLiteral(cookedStrings), ts.createArrayLiteral(rawStrings));
+            if (ts.isExternalModule(currentSourceFile)) {
+                var tempVar = ts.createUniqueName("templateObject");
+                recordTaggedTemplateString(tempVar);
+                templateArguments[0] = ts.createLogicalOr(tempVar, ts.createAssignment(tempVar, helperCall));
+            }
+            else {
+                templateArguments[0] = helperCall;
+            }
+            return ts.createCall(tag, undefined, templateArguments);
+        }
+        function getRawLiteral(node) {
+            var text = ts.getSourceTextOfNodeFromSourceFile(currentSourceFile, node);
+            var isLast = node.kind === 14 || node.kind === 17;
+            text = text.substring(1, text.length - (isLast ? 1 : 2));
+            text = text.replace(/\r\n?/g, "\n");
+            return ts.setTextRange(ts.createLiteral(text), node);
+        }
+        function visitTemplateExpression(node) {
+            var expressions = [];
+            addTemplateHead(expressions, node);
+            addTemplateSpans(expressions, node);
+            var expression = ts.reduceLeft(expressions, ts.createAdd);
+            if (ts.nodeIsSynthesized(expression)) {
+                expression.pos = node.pos;
+                expression.end = node.end;
+            }
+            return expression;
+        }
+        function shouldAddTemplateHead(node) {
+            ts.Debug.assert(node.templateSpans.length !== 0);
+            return node.head.text.length !== 0 || node.templateSpans[0].literal.text.length === 0;
+        }
+        function addTemplateHead(expressions, node) {
+            if (!shouldAddTemplateHead(node)) {
+                return;
+            }
+            expressions.push(ts.createLiteral(node.head.text));
+        }
+        function addTemplateSpans(expressions, node) {
+            for (var _i = 0, _a = node.templateSpans; _i < _a.length; _i++) {
+                var span = _a[_i];
+                expressions.push(ts.visitNode(span.expression, visitor, ts.isExpression));
+                if (span.literal.text.length !== 0) {
+                    expressions.push(ts.createLiteral(span.literal.text));
+                }
+            }
+        }
+        function visitSuperKeyword(isExpressionOfCall) {
+            return hierarchyFacts & 8
+                && !isExpressionOfCall
+                ? ts.createPropertyAccess(ts.createFileLevelUniqueName("_super"), "prototype")
+                : ts.createFileLevelUniqueName("_super");
+        }
+        function visitMetaProperty(node) {
+            if (node.keywordToken === 95 && node.name.escapedText === "target") {
+                if (hierarchyFacts & 8192) {
+                    hierarchyFacts |= 32768;
+                }
+                else {
+                    hierarchyFacts |= 16384;
+                }
+                return ts.createFileLevelUniqueName("_newTarget");
+            }
+            return node;
+        }
+        function onEmitNode(hint, node, emitCallback) {
+            if (enabledSubstitutions & 1 && ts.isFunctionLike(node)) {
+                var ancestorFacts = enterSubtree(16286, ts.getEmitFlags(node) & 8
+                    ? 65 | 16
+                    : 65);
+                previousOnEmitNode(hint, node, emitCallback);
+                exitSubtree(ancestorFacts, 0, 0);
+                return;
+            }
+            previousOnEmitNode(hint, node, emitCallback);
+        }
+        function enableSubstitutionsForBlockScopedBindings() {
+            if ((enabledSubstitutions & 2) === 0) {
+                enabledSubstitutions |= 2;
+                context.enableSubstitution(72);
+            }
+        }
+        function enableSubstitutionsForCapturedThis() {
+            if ((enabledSubstitutions & 1) === 0) {
+                enabledSubstitutions |= 1;
+                context.enableSubstitution(100);
+                context.enableEmitNotification(157);
+                context.enableEmitNotification(156);
+                context.enableEmitNotification(158);
+                context.enableEmitNotification(159);
+                context.enableEmitNotification(197);
+                context.enableEmitNotification(196);
+                context.enableEmitNotification(239);
+            }
+        }
+        function onSubstituteNode(hint, node) {
+            node = previousOnSubstituteNode(hint, node);
+            if (hint === 1) {
+                return substituteExpression(node);
+            }
+            if (ts.isIdentifier(node)) {
+                return substituteIdentifier(node);
+            }
+            return node;
+        }
+        function substituteIdentifier(node) {
+            if (enabledSubstitutions & 2 && !ts.isInternalName(node)) {
+                var original = ts.getParseTreeNode(node, ts.isIdentifier);
+                if (original && isNameOfDeclarationWithCollidingName(original)) {
+                    return ts.setTextRange(ts.getGeneratedNameForNode(original), node);
+                }
+            }
+            return node;
+        }
+        function isNameOfDeclarationWithCollidingName(node) {
+            switch (node.parent.kind) {
+                case 186:
+                case 240:
+                case 243:
+                case 237:
+                    return node.parent.name === node
+                        && resolver.isDeclarationWithCollidingName(n

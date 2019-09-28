@@ -1,0 +1,108 @@
+solver.isLateBound(ts.getParseTreeNode(input))) {
+                    return;
+                }
+            }
+            if (ts.isFunctionLike(input) && resolver.isImplementationOfOverload(input))
+                return;
+            if (ts.isSemicolonClassElement(input))
+                return;
+            var previousEnclosingDeclaration;
+            if (isEnclosingDeclaration(input)) {
+                previousEnclosingDeclaration = enclosingDeclaration;
+                enclosingDeclaration = input;
+            }
+            var oldDiag = getSymbolAccessibilityDiagnostic;
+            if (ts.isMethodDeclaration(input) || ts.isMethodSignature(input)) {
+                if (ts.hasModifier(input, 8)) {
+                    if (input.symbol && input.symbol.declarations && input.symbol.declarations[0] !== input)
+                        return;
+                    return cleanup(ts.createProperty(undefined, ensureModifiers(input), input.name, undefined, undefined, undefined));
+                }
+            }
+            var canProdiceDiagnostic = ts.canProduceDiagnostics(input);
+            if (canProdiceDiagnostic && !suppressNewDiagnosticContexts) {
+                getSymbolAccessibilityDiagnostic = ts.createGetSymbolAccessibilityDiagnosticForNode(input);
+            }
+            if (ts.isTypeQueryNode(input)) {
+                checkEntityNameVisibility(input.exprName, enclosingDeclaration);
+            }
+            var oldWithinObjectLiteralType = suppressNewDiagnosticContexts;
+            var shouldEnterSuppressNewDiagnosticsContextContext = ((input.kind === 168 || input.kind === 181) && input.parent.kind !== 242);
+            if (shouldEnterSuppressNewDiagnosticsContextContext) {
+                suppressNewDiagnosticContexts = true;
+            }
+            if (isProcessedComponent(input)) {
+                switch (input.kind) {
+                    case 211: {
+                        if ((ts.isEntityName(input.expression) || ts.isEntityNameExpression(input.expression))) {
+                            checkEntityNameVisibility(input.expression, enclosingDeclaration);
+                        }
+                        var node = ts.visitEachChild(input, visitDeclarationSubtree, context);
+                        return cleanup(ts.updateExpressionWithTypeArguments(node, ts.parenthesizeTypeParameters(node.typeArguments), node.expression));
+                    }
+                    case 164: {
+                        checkEntityNameVisibility(input.typeName, enclosingDeclaration);
+                        var node = ts.visitEachChild(input, visitDeclarationSubtree, context);
+                        return cleanup(ts.updateTypeReferenceNode(node, node.typeName, ts.parenthesizeTypeParameters(node.typeArguments)));
+                    }
+                    case 161:
+                        return cleanup(ts.updateConstructSignature(input, ensureTypeParams(input, input.typeParameters), updateParamsList(input, input.parameters), ensureType(input, input.type)));
+                    case 157: {
+                        var isPrivate = ts.hasModifier(input, 8);
+                        var ctor = ts.createSignatureDeclaration(157, isPrivate ? undefined : ensureTypeParams(input, input.typeParameters), isPrivate ? undefined : updateParamsList(input, input.parameters, 0), undefined);
+                        ctor.modifiers = ts.createNodeArray(ensureModifiers(input));
+                        return cleanup(ctor);
+                    }
+                    case 156: {
+                        var sig = ts.createSignatureDeclaration(155, ensureTypeParams(input, input.typeParameters), updateParamsList(input, input.parameters), ensureType(input, input.type));
+                        sig.name = input.name;
+                        sig.modifiers = ts.createNodeArray(ensureModifiers(input));
+                        sig.questionToken = input.questionToken;
+                        return cleanup(sig);
+                    }
+                    case 158: {
+                        var newNode = ensureAccessor(input);
+                        return cleanup(newNode);
+                    }
+                    case 159: {
+                        var newNode = ensureAccessor(input);
+                        return cleanup(newNode);
+                    }
+                    case 154:
+                        return cleanup(ts.updateProperty(input, undefined, ensureModifiers(input), input.name, input.questionToken, !ts.hasModifier(input, 8) ? ensureType(input, input.type) : undefined, ensureNoInitializer(input)));
+                    case 153:
+                        return cleanup(ts.updatePropertySignature(input, ensureModifiers(input), input.name, input.questionToken, !ts.hasModifier(input, 8) ? ensureType(input, input.type) : undefined, ensureNoInitializer(input)));
+                    case 155: {
+                        return cleanup(ts.updateMethodSignature(input, ensureTypeParams(input, input.typeParameters), updateParamsList(input, input.parameters), ensureType(input, input.type), input.name, input.questionToken));
+                    }
+                    case 160: {
+                        return cleanup(ts.updateCallSignature(input, ensureTypeParams(input, input.typeParameters), updateParamsList(input, input.parameters), ensureType(input, input.type)));
+                    }
+                    case 162: {
+                        return cleanup(ts.updateIndexSignature(input, undefined, ensureModifiers(input), updateParamsList(input, input.parameters), ts.visitNode(input.type, visitDeclarationSubtree) || ts.createKeywordTypeNode(120)));
+                    }
+                    case 237: {
+                        if (ts.isBindingPattern(input.name)) {
+                            return recreateBindingPattern(input.name);
+                        }
+                        shouldEnterSuppressNewDiagnosticsContextContext = true;
+                        suppressNewDiagnosticContexts = true;
+                        return cleanup(ts.updateVariableDeclaration(input, input.name, ensureType(input, input.type), ensureNoInitializer(input)));
+                    }
+                    case 150: {
+                        if (isPrivateMethodTypeParameter(input) && (input.default || input.constraint)) {
+                            return cleanup(ts.updateTypeParameterDeclaration(input, input.name, undefined, undefined));
+                        }
+                        return cleanup(ts.visitEachChild(input, visitDeclarationSubtree, context));
+                    }
+                    case 175: {
+                        var checkType = ts.visitNode(input.checkType, visitDeclarationSubtree);
+                        var extendsType = ts.visitNode(input.extendsType, visitDeclarationSubtree);
+                        var oldEnclosingDecl = enclosingDeclaration;
+                        enclosingDeclaration = input.trueType;
+                        var trueType = ts.visitNode(input.trueType, visitDeclarationSubtree);
+                        enclosingDeclaration = oldEnclosingDecl;
+                        var falseType = ts.visitNode(input.falseType, visitDeclarationSubtree);
+                        return cleanup(ts.updateConditionalTypeNode(input, checkType, extendsType, trueType, falseType));
+                    }
+           

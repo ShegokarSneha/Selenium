@@ -1,0 +1,330 @@
+taticError('Function/Class not supported', provider);
+        }
+        else if (provider && typeof provider === 'object' && provider.provide) {
+            // At this point we have what looks like a provider: {provide: ?, ....}
+            /** @type {?} */
+            let token = resolveForwardRef(provider.provide);
+            /** @type {?} */
+            const resolvedProvider = resolveProvider(provider);
+            if (provider.multi === true) {
+                // This is a multi provider.
+                /** @type {?} */
+                let multiProvider = records.get(token);
+                if (multiProvider) {
+                    if (multiProvider.fn !== MULTI_PROVIDER_FN) {
+                        throw multiProviderMixError(token);
+                    }
+                }
+                else {
+                    // Create a placeholder factory which will look up the constituents of the multi provider.
+                    records.set(token, multiProvider = (/** @type {?} */ ({
+                        token: provider.provide,
+                        deps: [],
+                        useNew: false,
+                        fn: MULTI_PROVIDER_FN,
+                        value: EMPTY
+                    })));
+                }
+                // Treat the provider as the token.
+                token = provider;
+                multiProvider.deps.push({ token, options: 6 /* Default */ });
+            }
+            /** @type {?} */
+            const record = records.get(token);
+            if (record && record.fn == MULTI_PROVIDER_FN) {
+                throw multiProviderMixError(token);
+            }
+            records.set(token, resolvedProvider);
+        }
+        else {
+            throw staticError('Unexpected provider', provider);
+        }
+    }
+}
+/**
+ * @param {?} token
+ * @param {?} record
+ * @param {?} records
+ * @param {?} parent
+ * @param {?} notFoundValue
+ * @param {?} flags
+ * @return {?}
+ */
+function tryResolveToken(token, record, records, parent, notFoundValue, flags) {
+    try {
+        return resolveToken(token, record, records, parent, notFoundValue, flags);
+    }
+    catch (e) {
+        // ensure that 'e' is of type Error.
+        if (!(e instanceof Error)) {
+            e = new Error(e);
+        }
+        /** @type {?} */
+        const path = e[NG_TEMP_TOKEN_PATH] = e[NG_TEMP_TOKEN_PATH] || [];
+        path.unshift(token);
+        if (record && record.value == CIRCULAR) {
+            // Reset the Circular flag.
+            record.value = EMPTY;
+        }
+        throw e;
+    }
+}
+/**
+ * @param {?} token
+ * @param {?} record
+ * @param {?} records
+ * @param {?} parent
+ * @param {?} notFoundValue
+ * @param {?} flags
+ * @return {?}
+ */
+function resolveToken(token, record, records, parent, notFoundValue, flags) {
+    /** @type {?} */
+    let value;
+    if (record && !(flags & InjectFlags.SkipSelf)) {
+        // If we don't have a record, this implies that we don't own the provider hence don't know how
+        // to resolve it.
+        value = record.value;
+        if (value == CIRCULAR) {
+            throw Error(NO_NEW_LINE + 'Circular dependency');
+        }
+        else if (value === EMPTY) {
+            record.value = CIRCULAR;
+            /** @type {?} */
+            let obj = undefined;
+            /** @type {?} */
+            let useNew = record.useNew;
+            /** @type {?} */
+            let fn = record.fn;
+            /** @type {?} */
+            let depRecords = record.deps;
+            /** @type {?} */
+            let deps = EMPTY;
+            if (depRecords.length) {
+                deps = [];
+                for (let i = 0; i < depRecords.length; i++) {
+                    /** @type {?} */
+                    const depRecord = depRecords[i];
+                    /** @type {?} */
+                    const options = depRecord.options;
+                    /** @type {?} */
+                    const childRecord = options & 2 /* CheckSelf */ ? records.get(depRecord.token) : undefined;
+                    deps.push(tryResolveToken(
+                    // Current Token to resolve
+                    depRecord.token, 
+                    // A record which describes how to resolve the token.
+                    // If undefined, this means we don't have such a record
+                    childRecord, 
+                    // Other records we know about.
+                    records, 
+                    // If we don't know how to resolve dependency and we should not check parent for it,
+                    // than pass in Null injector.
+                    !childRecord && !(options & 4 /* CheckParent */) ? NULL_INJECTOR$1 : parent, options & 1 /* Optional */ ? null : Injector.THROW_IF_NOT_FOUND, InjectFlags.Default));
+                }
+            }
+            record.value = value = useNew ? new ((/** @type {?} */ (fn)))(...deps) : fn.apply(obj, deps);
+        }
+    }
+    else if (!(flags & InjectFlags.Self)) {
+        value = parent.get(token, notFoundValue, InjectFlags.Default);
+    }
+    return value;
+}
+/**
+ * @param {?} provider
+ * @return {?}
+ */
+function computeDeps(provider) {
+    /** @type {?} */
+    let deps = EMPTY;
+    /** @type {?} */
+    const providerDeps = ((/** @type {?} */ (provider))).deps;
+    if (providerDeps && providerDeps.length) {
+        deps = [];
+        for (let i = 0; i < providerDeps.length; i++) {
+            /** @type {?} */
+            let options = 6 /* Default */;
+            /** @type {?} */
+            let token = resolveForwardRef(providerDeps[i]);
+            if (token instanceof Array) {
+                for (let j = 0, annotations = token; j < annotations.length; j++) {
+                    /** @type {?} */
+                    const annotation = annotations[j];
+                    if (annotation instanceof Optional || annotation == Optional) {
+                        options = options | 1 /* Optional */;
+                    }
+                    else if (annotation instanceof SkipSelf || annotation == SkipSelf) {
+                        options = options & ~2 /* CheckSelf */;
+                    }
+                    else if (annotation instanceof Self || annotation == Self) {
+                        options = options & ~4 /* CheckParent */;
+                    }
+                    else if (annotation instanceof Inject) {
+                        token = ((/** @type {?} */ (annotation))).token;
+                    }
+                    else {
+                        token = resolveForwardRef(annotation);
+                    }
+                }
+            }
+            deps.push({ token, options });
+        }
+    }
+    else if (((/** @type {?} */ (provider))).useExisting) {
+        /** @type {?} */
+        const token = resolveForwardRef(((/** @type {?} */ (provider))).useExisting);
+        deps = [{ token, options: 6 /* Default */ }];
+    }
+    else if (!providerDeps && !(USE_VALUE in provider)) {
+        // useValue & useExisting are the only ones which are exempt from deps all others need it.
+        throw staticError('\'deps\' required', provider);
+    }
+    return deps;
+}
+/**
+ * @param {?} text
+ * @param {?} obj
+ * @param {?=} source
+ * @return {?}
+ */
+function formatError(text, obj, source = null) {
+    text = text && text.charAt(0) === '\n' && text.charAt(1) == NO_NEW_LINE ? text.substr(2) : text;
+    /** @type {?} */
+    let context = stringify(obj);
+    if (obj instanceof Array) {
+        context = obj.map(stringify).join(' -> ');
+    }
+    else if (typeof obj === 'object') {
+        /** @type {?} */
+        let parts = (/** @type {?} */ ([]));
+        for (let key in obj) {
+            if (obj.hasOwnProperty(key)) {
+                /** @type {?} */
+                let value = obj[key];
+                parts.push(key + ':' + (typeof value === 'string' ? JSON.stringify(value) : stringify(value)));
+            }
+        }
+        context = `{${parts.join(', ')}}`;
+    }
+    return `StaticInjectorError${source ? '(' + source + ')' : ''}[${context}]: ${text.replace(NEW_LINE, '\n  ')}`;
+}
+/**
+ * @param {?} text
+ * @param {?} obj
+ * @return {?}
+ */
+function staticError(text, obj) {
+    return new Error(formatError(text, obj));
+}
+
+/**
+ * @fileoverview added by tsickle
+ * @suppress {checkTypes,extraRequire,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
+ */
+/**
+ * An internal token whose presence in an injector indicates that the injector should treat itself
+ * as a root scoped injector when processing requests for unknown tokens which may indicate
+ * they are provided in the root scope.
+ * @type {?}
+ */
+const APP_ROOT = new InjectionToken('The presence of this token marks an injector as being the root injector.');
+
+/**
+ * @fileoverview added by tsickle
+ * @suppress {checkTypes,extraRequire,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
+ */
+/**
+ * Marker which indicates that a value has not yet been created from the factory function.
+ * @type {?}
+ */
+const NOT_YET = {};
+/**
+ * Marker which indicates that the factory function for a token is in the process of being called.
+ *
+ * If the injector is asked to inject a token with its value set to CIRCULAR, that indicates
+ * injection of a dependency has recursively attempted to inject the original token, and there is
+ * a circular dependency among the providers.
+ * @type {?}
+ */
+const CIRCULAR$1 = {};
+/** @type {?} */
+const EMPTY_ARRAY$1 = (/** @type {?} */ ([]));
+/**
+ * A lazily initialized NullInjector.
+ * @type {?}
+ */
+let NULL_INJECTOR$2 = undefined;
+/**
+ * @return {?}
+ */
+function getNullInjector() {
+    if (NULL_INJECTOR$2 === undefined) {
+        NULL_INJECTOR$2 = new NullInjector();
+    }
+    return NULL_INJECTOR$2;
+}
+/**
+ * Create a new `Injector` which is configured using a `defType` of `InjectorType<any>`s.
+ *
+ * \@publicApi
+ * @param {?} defType
+ * @param {?=} parent
+ * @param {?=} additionalProviders
+ * @return {?}
+ */
+function createInjector(defType, parent = null, additionalProviders = null) {
+    parent = parent || getNullInjector();
+    return new R3Injector(defType, additionalProviders, parent);
+}
+class R3Injector {
+    /**
+     * @param {?} def
+     * @param {?} additionalProviders
+     * @param {?} parent
+     */
+    constructor(def, additionalProviders, parent) {
+        this.parent = parent;
+        /**
+         * Map of tokens to records which contain the instances of those tokens.
+         */
+        this.records = new Map();
+        /**
+         * The transitive set of `InjectorType`s which define this injector.
+         */
+        this.injectorDefTypes = new Set();
+        /**
+         * Set of values instantiated by this injector which contain `ngOnDestroy` lifecycle hooks.
+         */
+        this.onDestroy = new Set();
+        /**
+         * Flag indicating that this injector was previously destroyed.
+         */
+        this.destroyed = false;
+        // Start off by creating Records for every provider declared in every InjectorType
+        // included transitively in `def`.
+        /** @type {?} */
+        const dedupStack = [];
+        deepForEach([def], injectorDef => this.processInjectorType(injectorDef, [], dedupStack));
+        additionalProviders && deepForEach(additionalProviders, provider => this.processProvider(provider, def, additionalProviders));
+        // Make sure the INJECTOR token provides this injector.
+        this.records.set(INJECTOR$1, makeRecord(undefined, this));
+        // Detect whether this injector has the APP_ROOT_SCOPE token and thus should provide
+        // any injectable scoped to APP_ROOT_SCOPE.
+        this.isRootInjector = this.records.has(APP_ROOT);
+        // Eagerly instantiate the InjectorType classes themselves.
+        this.injectorDefTypes.forEach(defType => this.get(defType));
+    }
+    /**
+     * Destroy the injector and release references to every instance or provider associated with it.
+     *
+     * Also calls the `OnDestroy` lifecycle hooks of every instance that was created for which a
+     * hook was found.
+     * @return {?}
+     */
+    destroy() {
+        this.assertNotDestroyed();
+        // Set destroyed = true first, in case lifecycle hooks re-enter destroy().
+        this.destroyed = true;
+        try {
+            // Call all the lifecycle hooks.
+            this.onDestroy.forEach(serv

@@ -1,0 +1,241 @@
+    * @param items Additional items to add to the end of array1.
+      */
+    concat(...items: (T | ConcatArray<T>)[]): T[];
+    /**
+      * Adds all the elements of an array separated by the specified separator string.
+      * @param separator A string used to separate one element of an array from the next in the resulting String. If omitted, the array elements are separated with a comma.
+      */
+    join(separator?: string): string;
+    /**
+      * Reverses the elements in an Array.
+      */
+    reverse(): T[];
+    /**
+      * Removes the first element from an array and returns it.
+      */
+    shift(): T | undefined;
+    /**
+      * Returns a section of an array.
+      * @param start The beginning of the specified portion of the array.
+      * @param end The end of the specified portion of the array.
+      */
+    slice(start?: number, end?: number): T[];
+    /**
+      * Sorts an array.
+      * @param compareFn The name of the function used to determine the order of the elements. If omitted, the elements are sorted in ascending, ASCII character order.
+      */
+    sort(compareFn?: (a: T, b: T) => number): this;
+    /**
+      * Removes elements from an array and, if necessary, inserts new elements in their place, returning the deleted elements.
+      * @param start The zero-based location in the array from which to start removing elements.
+      * @param deleteCount The number of elements to remove.
+      */
+    splice(start: number, deleteCount?: number): T[];
+    /**
+      * Removes elements from an array and, if necessary, inserts new elements in their place, returning the deleted elements.
+      * @param start The zero-based location in the array from which to start removing elements.
+      * @param deleteCount The number of elements to remove.
+      * @param items Elements to insert into the array in place of the deleted elements.
+      */
+    splice(start: number, deleteCount: number, ...items: T[]): T[];
+    /**
+      * Inserts new elements at the start of an array.
+      * @param items  Elements to insert at the start of the Array.
+      */
+    unshift(...items: T[]): number;
+    /**
+      * Returns the index of the first occurrence of a value in an array.
+      * @param searchElement The value to locate in the array.
+      * @param fromIndex The array index at which to begin the search. If fromIndex is omitted, the search starts at index 0.
+      */
+    indexOf(searchElement: T, fromIndex?: number): number;
+    /**
+      * Returns the index of the last occurrence of a specified value in an array.
+      * @param searchElement The value to locate in the array.
+      * @param fromIndex The array index at which to begin the search. If fromIndex is omitted, the search starts at the last index in the array.
+      */
+    lastIndexOf(searchElement: T, fromIndex?: number): number;
+    /**
+      * Determines whether all the members of an array satisfy the specified test.
+      * @param callbackfn A function that accepts up to three arguments. The every method calls the callbackfn function for each element in array1 until the callbackfn returns false, or until the end of the array.
+      * @param thisArg An object to which the this keyword can refer in the callbackfn function. If thisArg is omitted, undefined is used as the this value.
+      */
+    every(callbackfn: (value: T, index: number, array: T[]) => boolean, thisArg?: any): boolean;
+    /**
+      * Determines whether the specified callback function returns true for any element of an array.
+      * @param callbackfn A function that accepts up to three arguments. The some method calls the callbackfn function for each element in array1 until the callbackfn returns true, or until the end of the array.
+      * @param thisArg An object to which the this keyword can refer in the callbackfn function. If thisArg is omitted, undefined is used as the this value.
+      */
+    some(callbackfn: (value: T, index: number, array: T[]) => boolean, thisArg?: any): boolean;
+    /**
+      * Performs the specified action for each element in an array.
+      * @param callbackfn  A function that accepts up to three arguments. forEach calls the callbackfn function one time for each element in the array.
+      * @param thisArg  An object to which the this keyword can refer in the callbackfn function. If thisArg is omitted, undefined is used as the this value.
+      */
+    forEach(callbackfn: (value: T, index: number, array: T[]) => void, thisArg?: any): void;
+    /**
+      * Calls a defined callback function on each element of an array, and returns an array that contains the results.
+      * @param callbackfn A function that accepts up to three arguments. The map method calls the callbackfn function one time for each element in the array.
+      * @param thisArg An object to which the this keyword can refer in the callbackfn function. If thisArg is omitted, undefined is used as the this value.
+      */
+    map<U>(callbackfn: (value: T, index: number, array: T[]) => U, thisArg?: any): U[];
+    /**
+     * Returns the elements of an array that meet the condition specified in a callback function.
+     * @param callbackfn A function that accepts up to three arguments. The filter method calls the callbackfn function one time for each element in the array.
+     * @param thisArg An object to which the this keyword can refer in the callbackfn function. If thisArg is omitted, undefined is used as the this value.
+     */
+    filter<S extends T>(callbackfn: (value: T, index: number, array: T[]) => value is S, thisArg?: any): S[];
+    /**
+      * Returns the elements of an array that meet the condition specified in a callback function.
+      * @param callbackfn A function that accepts up to three arguments. The filter method calls the callbackfn function one time for each element in the array.
+      * @param thisArg An object to which the this keyword can refer in the callbackfn function. If thisArg is omitted, undefined is used as the this value.
+      */
+    filter(callbackfn: (value: T, index: number, array: T[]) => any, thisArg?: any): T[];
+    /**
+      * Calls the specified callback function for all the elements in an array. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.
+      * @param callbackfn A function that accepts up to four arguments. The reduce method calls the callbackfn function one time for each element in the array.
+      * @param initialValue If initialValue is specified, it is used as the initial value to start the accumulation. The first call to the callbackfn function provides this value as an argument instead of an array value.
+      */
+    reduce(callbackfn: (previousValue: T, currentValue: T, currentIndex: number, array: T[]) => T): T;
+    reduce(callbackfn: (previousValue: T, currentValue: T, currentIndex: number, array: T[]) => T, initialValue: T): T;
+    /**
+      * Calls the specified callback function for all the elements in an array. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.
+      * @param callbackfn A function that accepts up to four arguments. The reduce method calls the callbackfn function one time for each element in the array.
+      * @param initialValue If initialValue is specified, it is used as the initial value to start the accumulation. The first call to the callbackfn function provides this value as an argument instead of an array value.
+      */
+    reduce<U>(callbackfn: (previousValue: U, currentValue: T, currentIndex: number, array: T[]) => U, initialValue: U): U;
+    /**
+      * Calls the specified callback function for all the elements in an array, in descending order. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.
+      * @param callbackfn A function that accepts up to four arguments. The reduceRight method calls the callbackfn function one time for each element in the array.
+      * @param initialValue If initialValue is specified, it is used as the initial value to start the accumulation. The first call to the callbackfn function provides this value as an argument instead of an array value.
+      */
+    reduceRight(callbackfn: (previousValue: T, currentValue: T, currentIndex: number, array: T[]) => T): T;
+    reduceRight(callbackfn: (previousValue: T, currentValue: T, currentIndex: number, array: T[]) => T, initialValue: T): T;
+    /**
+      * Calls the specified callback function for all the elements in an array, in descending order. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.
+      * @param callbackfn A function that accepts up to four arguments. The reduceRight method calls the callbackfn function one time for each element in the array.
+      * @param initialValue If initialValue is specified, it is used as the initial value to start the accumulation. The first call to the callbackfn function provides this value as an argument instead of an array value.
+      */
+    reduceRight<U>(callbackfn: (previousValue: U, currentValue: T, currentIndex: number, array: T[]) => U, initialValue: U): U;
+
+    [n: number]: T;
+}
+
+interface ArrayConstructor {
+    new(arrayLength?: number): any[];
+    new <T>(arrayLength: number): T[];
+    new <T>(...items: T[]): T[];
+    (arrayLength?: number): any[];
+    <T>(arrayLength: number): T[];
+    <T>(...items: T[]): T[];
+    isArray(arg: any): arg is Array<any>;
+    readonly prototype: Array<any>;
+}
+
+declare const Array: ArrayConstructor;
+
+interface TypedPropertyDescriptor<T> {
+    enumerable?: boolean;
+    configurable?: boolean;
+    writable?: boolean;
+    value?: T;
+    get?: () => T;
+    set?: (value: T) => void;
+}
+
+declare type ClassDecorator = <TFunction extends Function>(target: TFunction) => TFunction | void;
+declare type PropertyDecorator = (target: Object, propertyKey: string | symbol) => void;
+declare type MethodDecorator = <T>(target: Object, propertyKey: string | symbol, descriptor: TypedPropertyDescriptor<T>) => TypedPropertyDescriptor<T> | void;
+declare type ParameterDecorator = (target: Object, propertyKey: string | symbol, parameterIndex: number) => void;
+
+declare type PromiseConstructorLike = new <T>(executor: (resolve: (value?: T | PromiseLike<T>) => void, reject: (reason?: any) => void) => void) => PromiseLike<T>;
+
+interface PromiseLike<T> {
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): PromiseLike<TResult1 | TResult2>;
+}
+
+/**
+ * Represents the completion of an asynchronous operation
+ */
+interface Promise<T> {
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): Promise<TResult1 | TResult2>;
+
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): Promise<T | TResult>;
+}
+
+interface ArrayLike<T> {
+    readonly length: number;
+    readonly [n: number]: T;
+}
+
+/**
+ * Make all properties in T optional
+ */
+type Partial<T> = {
+    [P in keyof T]?: T[P];
+};
+
+/**
+ * Make all properties in T required
+ */
+type Required<T> = {
+    [P in keyof T]-?: T[P];
+};
+
+/**
+ * Make all properties in T readonly
+ */
+type Readonly<T> = {
+    readonly [P in keyof T]: T[P];
+};
+
+/**
+ * From T, pick a set of properties whose keys are in the union K
+ */
+type Pick<T, K extends keyof T> = {
+    [P in K]: T[P];
+};
+
+/**
+ * Construct a type with a set of properties K of type T
+ */
+type Record<K extends keyof any, T> = {
+    [P in K]: T;
+};
+
+/**
+ * Exclude from T those types that are assignable to U
+ */
+type Exclude<T, U> = T extends U ? never : T;
+
+/**
+ * Extract from T those types that are assignable to U
+ */
+type Extract<T, U> = T extends U ? T : never;
+
+/**
+ * Exclude null and undefined from T
+ */
+type NonNullable<T> = T extends null | undefined ? never : T;
+
+/**
+ * Obtain the parameters of a function type in a tuple
+ */
+type Parameters<T extends (...args: any[]) => 

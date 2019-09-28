@@ -1,0 +1,255 @@
+﻿1
+00:00:00,390 --> 00:00:03,930
+Want to come back with more it's curious and best practice questions.
+
+2
+00:00:03,930 --> 00:00:05,660
+And here is another one.
+
+3
+00:00:07,800 --> 00:00:15,480
+A junior architect in your team is facing a client issue and is unsure how to fix the client has a two
+
+4
+00:00:15,480 --> 00:00:18,010
+tier web application.
+
+5
+00:00:18,090 --> 00:00:23,310
+It is not just that the web player is not performing correctly so there is a problem with the web app
+
+6
+00:00:23,820 --> 00:00:31,350
+and upon troubleshooting it was found that a lot of fights were dropped as the database layer is not
+
+7
+00:00:31,350 --> 00:00:34,300
+able to keep up with the right traffic load.
+
+8
+00:00:34,650 --> 00:00:42,000
+So you have web app applications so this is a two tier web app and this is your database.
+
+9
+00:00:42,060 --> 00:00:47,850
+There is transactions happening or communication happening between the app and the database for writes
+
+10
+00:00:47,880 --> 00:00:48,490
+and reads.
+
+11
+00:00:48,540 --> 00:00:54,600
+That's what the appendectomies are for but it is not just that the application layer is not working
+
+12
+00:00:54,600 --> 00:01:02,010
+fine and when they troubleshoot they found a lot of dropped rights between the app and database.
+
+13
+00:01:02,040 --> 00:01:06,930
+So there's a lot of the ADD would send to write the data.
+
+14
+00:01:06,930 --> 00:01:08,370
+Waiting for an acknowledgment.
+
+15
+00:01:08,370 --> 00:01:10,120
+Probably that an agent is not coming back.
+
+16
+00:01:10,140 --> 00:01:12,990
+Or it never comes back or takes time to come back.
+
+17
+00:01:13,230 --> 00:01:15,810
+So the application now is not performing well.
+
+18
+00:01:19,090 --> 00:01:23,300
+The junior architect is asking how can she offload the database right.
+
+19
+00:01:23,310 --> 00:01:29,980
+Is there a way to overload the database rights such that the application layer can function normally
+
+20
+00:01:30,430 --> 00:01:36,370
+without having to wait for the data with little acknowledgement for the right sent and keeping cost
+
+21
+00:01:36,370 --> 00:01:41,040
+effectiveness in mind so the client want to fix the problem cost effectively.
+
+22
+00:01:41,450 --> 00:01:49,270
+And what she is asking what the architect is asking is can I write somehow to another place not the
+
+23
+00:01:49,270 --> 00:01:52,530
+database directly and keep the application.
+
+24
+00:01:52,550 --> 00:01:59,170
+So the opposition will write and then we'll keep going with process more requests and will keep writing
+
+25
+00:01:59,200 --> 00:02:07,720
+to that third party or third place or location without depending on writing to the database and waiting
+
+26
+00:02:07,720 --> 00:02:09,910
+for the database to respond.
+
+27
+00:02:09,910 --> 00:02:10,780
+Is there a way to do that.
+
+28
+00:02:10,780 --> 00:02:17,220
+That's the question you have from the junior architect in your team with cost effectiveness in mind.
+
+29
+00:02:17,260 --> 00:02:25,160
+A migrate the current database layer to Dynamo DBI which will be able to cater for the right load be
+
+30
+00:02:25,680 --> 00:02:30,940
+decoupled the two layers by changing the web app layer to write to an Eskew.
+
+31
+00:02:30,980 --> 00:02:39,410
+So instead of writing to the database why don't you write to an obscure Q then launch a new app component
+
+32
+00:02:39,590 --> 00:02:41,250
+that will write to read it later.
+
+33
+00:02:41,270 --> 00:02:48,870
+So here write to the queue then have a new component on an elastic easy to group for instance.
+
+34
+00:02:49,010 --> 00:02:54,800
+All what it will do is go find out if there is any data to be read into the database and then write
+
+35
+00:02:54,800 --> 00:02:55,740
+it to the database.
+
+36
+00:02:57,190 --> 00:03:04,510
+And here now the database and the application it's up to them to work at whatever speed or rate in order
+
+37
+00:03:04,510 --> 00:03:12,370
+for that is to be able to not to miss any rights and to achieve the goal which is have the application
+
+38
+00:03:12,430 --> 00:03:20,580
+being independent from the database performance see modified the application to write two and three
+
+39
+00:03:20,580 --> 00:03:24,960
+bucket then have him or move the data to the database.
+
+40
+00:03:24,960 --> 00:03:32,610
+So save all the data into an S3 bucket and then have him are launching in March last year basically
+
+41
+00:03:32,730 --> 00:03:36,660
+that will read the data and transfer it to your database.
+
+42
+00:03:36,750 --> 00:03:42,980
+The spent fuel replicas of the Digby's layer and direct read operations to that he jumped.
+
+43
+00:03:43,010 --> 00:03:48,390
+All right so let's go through the and it's a good day.
+
+44
+00:03:48,440 --> 00:03:51,310
+It really is a dynamo D-B which will be able to get the food right.
+
+45
+00:03:51,330 --> 00:03:57,510
+That's excellent and dining with the we can scale and it is a web too as they call a database non-sequel
+
+46
+00:03:57,600 --> 00:03:59,200
+So it's very fast.
+
+47
+00:03:59,200 --> 00:04:06,540
+However this is a major migration and you're talking about dynamically be changing the database and
+
+48
+00:04:06,690 --> 00:04:08,030
+whatever data is they had.
+
+49
+00:04:08,070 --> 00:04:14,120
+They had skills to run that database but now are asking for more new skills as well for the operations
+
+50
+00:04:14,130 --> 00:04:19,500
+they are complicating the migration and you're completely complicating the ongoing administration.
+
+51
+00:04:19,500 --> 00:04:22,840
+So you did not actually keep cost effective in mind.
+
+52
+00:04:23,870 --> 00:04:27,450
+You did not keep cost effectiveness in mind that's why it is wrong.
+
+53
+00:04:27,690 --> 00:04:31,740
+The decouple the two leaders by changing the airplane to right to an excuse.
+
+54
+00:04:31,760 --> 00:04:39,500
+Q then launch a new app component that will rise to the data base layer it will work but depending on
+
+55
+00:04:39,500 --> 00:04:46,130
+the cost of the new app component that you will do see where if the application right on S-3 back and
+
+56
+00:04:46,130 --> 00:04:50,220
+then have EMR move the data to the database.
+
+57
+00:04:50,220 --> 00:04:57,450
+Now we are getting 3 into play storage costs and in my cost or cost as well.
+
+58
+00:04:59,200 --> 00:05:06,370
+So despite it will work I believe this might end up being more expensive these 10 Furio replicas of
+
+59
+00:05:06,370 --> 00:05:11,110
+the distributor layer and that really operations to the reader because so here its indirectly trying
+
+60
+00:05:11,110 --> 00:05:16,280
+to fix the problem by database had writes and reads.
+
+61
+00:05:16,450 --> 00:05:22,090
+So here what Im saying is why dont you spin a few Republicans have their IT operations be served from
+
+62
+00:05:22,090 --> 00:05:25,860
+the Republicans and that it will be on the rights.
+
+63
+00:05:26,020 --> 00:05:33,830
+Well that that could work but we dont know how much that will offload.
+
+64
+00:05:33,830 --> 00:05:42,740
+I mean is that a mini Debbies intensive right operations here or ther

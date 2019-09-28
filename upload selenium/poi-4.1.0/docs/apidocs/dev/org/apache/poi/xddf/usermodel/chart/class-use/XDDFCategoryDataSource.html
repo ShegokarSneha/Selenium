@@ -1,0 +1,161 @@
+reateFunctionForBodyOfIterationStatement(node, currentState, outerConvertedLoopState) : undefined;
+            convertedLoopState = outerConvertedLoopState;
+            if (initializerFunction)
+                statements.push(initializerFunction.functionDeclaration);
+            if (bodyFunction)
+                statements.push(bodyFunction.functionDeclaration);
+            addExtraDeclarationsForConvertedLoop(statements, currentState, outerConvertedLoopState);
+            if (initializerFunction) {
+                statements.push(generateCallToConvertedLoopInitializer(initializerFunction.functionName, initializerFunction.containsYield));
+            }
+            var loop;
+            if (bodyFunction) {
+                if (convert) {
+                    loop = convert(node, outermostLabeledStatement, bodyFunction.part);
+                }
+                else {
+                    var clone_3 = convertIterationStatementCore(node, initializerFunction, ts.createBlock(bodyFunction.part, true));
+                    ts.aggregateTransformFlags(clone_3);
+                    loop = ts.restoreEnclosingLabel(clone_3, outermostLabeledStatement, convertedLoopState && resetLabel);
+                }
+            }
+            else {
+                var clone_4 = convertIterationStatementCore(node, initializerFunction, ts.visitNode(node.statement, visitor, ts.isStatement, ts.liftToBlock));
+                ts.aggregateTransformFlags(clone_4);
+                loop = ts.restoreEnclosingLabel(clone_4, outermostLabeledStatement, convertedLoopState && resetLabel);
+            }
+            statements.push(loop);
+            return statements;
+        }
+        function convertIterationStatementCore(node, initializerFunction, convertedLoopBody) {
+            switch (node.kind) {
+                case 225: return convertForStatement(node, initializerFunction, convertedLoopBody);
+                case 226: return convertForInStatement(node, convertedLoopBody);
+                case 227: return convertForOfStatement(node, convertedLoopBody);
+                case 223: return convertDoStatement(node, convertedLoopBody);
+                case 224: return convertWhileStatement(node, convertedLoopBody);
+                default: return ts.Debug.failBadSyntaxKind(node, "IterationStatement expected");
+            }
+        }
+        function convertForStatement(node, initializerFunction, convertedLoopBody) {
+            var shouldConvertCondition = node.condition && shouldConvertPartOfIterationStatement(node.condition);
+            var shouldConvertIncrementor = shouldConvertCondition || node.incrementor && shouldConvertPartOfIterationStatement(node.incrementor);
+            return ts.updateFor(node, ts.visitNode(initializerFunction ? initializerFunction.part : node.initializer, visitor, ts.isForInitializer), ts.visitNode(shouldConvertCondition ? undefined : node.condition, visitor, ts.isExpression), ts.visitNode(shouldConvertIncrementor ? undefined : node.incrementor, visitor, ts.isExpression), convertedLoopBody);
+        }
+        function convertForOfStatement(node, convertedLoopBody) {
+            return ts.updateForOf(node, undefined, ts.visitNode(node.initializer, visitor, ts.isForInitializer), ts.visitNode(node.expression, visitor, ts.isExpression), convertedLoopBody);
+        }
+        function convertForInStatement(node, convertedLoopBody) {
+            return ts.updateForIn(node, ts.visitNode(node.initializer, visitor, ts.isForInitializer), ts.visitNode(node.expression, visitor, ts.isExpression), convertedLoopBody);
+        }
+        function convertDoStatement(node, convertedLoopBody) {
+            return ts.updateDo(node, convertedLoopBody, ts.visitNode(node.expression, visitor, ts.isExpression));
+        }
+        function convertWhileStatement(node, convertedLoopBody) {
+            return ts.updateWhile(node, ts.visitNode(node.expression, visitor, ts.isExpression), convertedLoopBody);
+        }
+        function createConvertedLoopState(node) {
+            var loopInitializer;
+            switch (node.kind) {
+                case 225:
+                case 226:
+                case 227:
+                    var initializer = node.initializer;
+                    if (initializer && initializer.kind === 238) {
+                        loopInitializer = initializer;
+                    }
+                    break;
+            }
+            var loopParameters = [];
+            var loopOutParameters = [];
+            if (loopInitializer && (ts.getCombinedNodeFlags(loopInitializer) & 3)) {
+                var hasCapturedBindingsInForInitializer = shouldConvertInitializerOfForStatement(node);
+                for (var _i = 0, _a = loopInitializer.declarations; _i < _a.length; _i++) {
+                    var decl = _a[_i];
+                    processLoopVariableDeclaration(node, decl, loopParameters, loopOutParameters, hasCapturedBindingsInForInitializer);
+                }
+            }
+            var currentState = { loopParameters: loopParameters, loopOutParameters: loopOutParameters };
+            if (convertedLoopState) {
+                if (convertedLoopState.argumentsName) {
+                    currentState.argumentsName = convertedLoopState.argumentsName;
+                }
+                if (convertedLoopState.thisName) {
+                    currentState.thisName = convertedLoopState.thisName;
+                }
+                if (convertedLoopState.hoistedLocalVariables) {
+                    currentState.hoistedLocalVariables = convertedLoopState.hoistedLocalVariables;
+                }
+            }
+            return currentState;
+        }
+        function addExtraDeclarationsForConvertedLoop(statements, state, outerState) {
+            var extraVariableDeclarations;
+            if (state.argumentsName) {
+                if (outerState) {
+                    outerState.argumentsName = state.argumentsName;
+                }
+                else {
+                    (extraVariableDeclarations || (extraVariableDeclarations = [])).push(ts.createVariableDeclaration(state.argumentsName, undefined, ts.createIdentifier("arguments")));
+                }
+            }
+            if (state.thisName) {
+                if (outerState) {
+                    outerState.thisName = state.thisName;
+                }
+                else {
+                    (extraVariableDeclarations || (extraVariableDeclarations = [])).push(ts.createVariableDeclaration(state.thisName, undefined, ts.createIdentifier("this")));
+                }
+            }
+            if (state.hoistedLocalVariables) {
+                if (outerState) {
+                    outerState.hoistedLocalVariables = state.hoistedLocalVariables;
+                }
+                else {
+                    if (!extraVariableDeclarations) {
+                        extraVariableDeclarations = [];
+                    }
+                    for (var _i = 0, _a = state.hoistedLocalVariables; _i < _a.length; _i++) {
+                        var identifier = _a[_i];
+                        extraVariableDeclarations.push(ts.createVariableDeclaration(identifier));
+                    }
+                }
+            }
+            if (state.loopOutParameters.length) {
+                if (!extraVariableDeclarations) {
+                    extraVariableDeclarations = [];
+                }
+                for (var _b = 0, _c = state.loopOutParameters; _b < _c.length; _b++) {
+                    var outParam = _c[_b];
+                    extraVariableDeclarations.push(ts.createVariableDeclaration(outParam.outParamName));
+                }
+            }
+            if (state.conditionVariable) {
+                if (!extraVariableDeclarations) {
+                    extraVariableDeclarations = [];
+                }
+                extraVariableDeclarations.push(ts.createVariableDeclaration(state.conditionVariable, undefined, ts.createFalse()));
+            }
+            if (extraVariableDeclarations) {
+                statements.push(ts.createVariableStatement(undefined, ts.createVariableDeclarationList(extraVariableDeclarations)));
+            }
+        }
+        function createOutVariable(p) {
+            return ts.createVariableDeclaration(p.originalName, undefined, p.outParamName);
+        }
+        function createFunctionForInitializerOfForStatement(node, currentState) {
+            var functionName = ts.createUniqueName("_loop_init");
+            var containsYield = (node.initializer.transformFlags & 4194304) !== 0;
+            var emitFlags = 0;
+            if (currentState.containsLexicalThis)
+                emitFlags |= 8;
+            if (containsYield && hierarchyFacts & 4)
+                emitFlags |= 262144;
+            var statements = [];
+            statements.push(ts.createVariableStatement(undefined, node.initializer));
+            copyOutParameters(currentState.loopOutParameters, 2, 1, statements);
+            var functionDeclaration = ts.createVariableStatement(undefined, ts.setEmitFlags(ts.createVariableDeclarationList([
+                ts.createVariableDeclaration(functionName, undefined, ts.setEmitFlags(ts.createFunctionExpression(undefined, containsYield ? ts.createToken(40) : undefined, undefined, undefined, undefined, undefined, ts.visitNode(ts.createBlock(statements, true), visitor, ts.isBlock)), emitFlags))
+            ]), 2097152));
+            var part = ts.createVariableDeclarationList(ts.map(currentState.loopOutParameters, createOutVariable));
+            return { functionName: functionName, containsYield: containsYield, functionDeclaration: funct

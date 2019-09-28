@@ -1,0 +1,92 @@
+      }
+            return false;
+        }
+        function getBindingNameVisible(elem) {
+            if (ts.isOmittedExpression(elem)) {
+                return false;
+            }
+            if (ts.isBindingPattern(elem.name)) {
+                return ts.some(elem.name.elements, getBindingNameVisible);
+            }
+            else {
+                return resolver.isDeclarationVisible(elem);
+            }
+        }
+        function updateParamsList(node, params, modifierMask) {
+            if (ts.hasModifier(node, 8)) {
+                return undefined;
+            }
+            var newParams = ts.map(params, function (p) { return ensureParameter(p, modifierMask); });
+            if (!newParams) {
+                return undefined;
+            }
+            return ts.createNodeArray(newParams, params.hasTrailingComma);
+        }
+        function ensureTypeParams(node, params) {
+            return ts.hasModifier(node, 8) ? undefined : ts.visitNodes(params, visitDeclarationSubtree);
+        }
+        function isEnclosingDeclaration(node) {
+            return ts.isSourceFile(node)
+                || ts.isTypeAliasDeclaration(node)
+                || ts.isModuleDeclaration(node)
+                || ts.isClassDeclaration(node)
+                || ts.isInterfaceDeclaration(node)
+                || ts.isFunctionLike(node)
+                || ts.isIndexSignatureDeclaration(node)
+                || ts.isMappedTypeNode(node);
+        }
+        function checkEntityNameVisibility(entityName, enclosingDeclaration) {
+            var visibilityResult = resolver.isEntityNameVisible(entityName, enclosingDeclaration);
+            handleSymbolAccessibilityError(visibilityResult);
+            recordTypeReferenceDirectivesIfNecessary(resolver.getTypeReferenceDirectivesForEntityName(entityName));
+        }
+        function preserveJsDoc(updated, original) {
+            if (ts.hasJSDocNodes(updated) && ts.hasJSDocNodes(original)) {
+                updated.jsDoc = original.jsDoc;
+            }
+            return ts.setCommentRange(updated, ts.getCommentRange(original));
+        }
+        function rewriteModuleSpecifier(parent, input) {
+            if (!input)
+                return undefined;
+            resultHasExternalModuleIndicator = resultHasExternalModuleIndicator || (parent.kind !== 244 && parent.kind !== 183);
+            if (ts.isStringLiteralLike(input)) {
+                if (isBundledEmit) {
+                    var newName = ts.getExternalModuleNameFromDeclaration(context.getEmitHost(), resolver, parent);
+                    if (newName) {
+                        return ts.createLiteral(newName);
+                    }
+                }
+                else {
+                    var symbol = resolver.getSymbolOfExternalModuleSpecifier(input);
+                    if (symbol) {
+                        (exportedModulesFromDeclarationEmit || (exportedModulesFromDeclarationEmit = [])).push(symbol);
+                    }
+                }
+            }
+            return input;
+        }
+        function transformImportEqualsDeclaration(decl) {
+            if (!resolver.isDeclarationVisible(decl))
+                return;
+            if (decl.moduleReference.kind === 259) {
+                var specifier = ts.getExternalModuleImportEqualsDeclarationExpression(decl);
+                return ts.updateImportEqualsDeclaration(decl, undefined, decl.modifiers, decl.name, ts.updateExternalModuleReference(decl.moduleReference, rewriteModuleSpecifier(decl, specifier)));
+            }
+            else {
+                var oldDiag = getSymbolAccessibilityDiagnostic;
+                getSymbolAccessibilityDiagnostic = ts.createGetSymbolAccessibilityDiagnosticForNode(decl);
+                checkEntityNameVisibility(decl.moduleReference, enclosingDeclaration);
+                getSymbolAccessibilityDiagnostic = oldDiag;
+                return decl;
+            }
+        }
+        function transformImportDeclaration(decl) {
+            if (!decl.importClause) {
+                return ts.updateImportDeclaration(decl, undefined, decl.modifiers, decl.importClause, rewriteModuleSpecifier(decl, decl.moduleSpecifier));
+            }
+            var visibleDefaultBinding = decl.importClause && decl.importClause.name && resolver.isDeclarationVisible(decl.importClause) ? decl.importClause.name : undefined;
+            if (!decl.importClause.namedBindings) {
+                return visibleDefaultBinding && ts.updateImportDeclaration(decl, undefined, decl.modifiers, ts.updateImportClause(decl.importClause, visibleDefaultBinding, undefined), rewriteModuleSpecifier(decl, decl.moduleSpecifier));
+            }
+            if (dec

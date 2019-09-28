@@ -1,0 +1,198 @@
+": "long"
+              },
+              "ItemCount": {
+                "type": "long"
+              },
+              "IndexArn": {}
+            }
+          }
+        },
+        "GlobalSecondaryIndexes": {
+          "type": "list",
+          "member": {
+            "type": "structure",
+            "members": {
+              "IndexName": {},
+              "KeySchema": {
+                "shape": "S23"
+              },
+              "Projection": {
+                "shape": "S28"
+              },
+              "IndexStatus": {},
+              "Backfilling": {
+                "type": "boolean"
+              },
+              "ProvisionedThroughput": {
+                "shape": "S2r"
+              },
+              "IndexSizeBytes": {
+                "type": "long"
+              },
+              "ItemCount": {
+                "type": "long"
+              },
+              "IndexArn": {}
+            }
+          }
+        },
+        "StreamSpecification": {
+          "shape": "S2h"
+        },
+        "LatestStreamLabel": {},
+        "LatestStreamArn": {},
+        "RestoreSummary": {
+          "type": "structure",
+          "required": [
+            "RestoreDateTime",
+            "RestoreInProgress"
+          ],
+          "members": {
+            "SourceBackupArn": {},
+            "SourceTableArn": {},
+            "RestoreDateTime": {
+              "type": "timestamp"
+            },
+            "RestoreInProgress": {
+              "type": "boolean"
+            }
+          }
+        },
+        "SSEDescription": {
+          "shape": "S37"
+        }
+      }
+    },
+    "S2r": {
+      "type": "structure",
+      "members": {
+        "LastIncreaseDateTime": {
+          "type": "timestamp"
+        },
+        "LastDecreaseDateTime": {
+          "type": "timestamp"
+        },
+        "NumberOfDecreasesToday": {
+          "type": "long"
+        },
+        "ReadCapacityUnits": {
+          "type": "long"
+        },
+        "WriteCapacityUnits": {
+          "type": "long"
+        }
+      }
+    },
+    "S2w": {
+      "type": "structure",
+      "members": {
+        "BillingMode": {},
+        "LastUpdateToPayPerRequestDateTime": {
+          "type": "timestamp"
+        }
+      }
+    },
+    "S37": {
+      "type": "structure",
+      "members": {
+        "Status": {},
+        "SSEType": {},
+        "KMSMasterKeyArn": {}
+      }
+    },
+    "S3c": {
+      "type": "structure",
+      "members": {
+        "BackupDetails": {
+          "shape": "S1h"
+        },
+        "SourceTableDetails": {
+          "type": "structure",
+          "required": [
+            "TableName",
+            "TableId",
+            "KeySchema",
+            "TableCreationDateTime",
+            "ProvisionedThroughput"
+          ],
+          "members": {
+            "TableName": {},
+            "TableId": {},
+            "TableArn": {},
+            "TableSizeBytes": {
+              "type": "long"
+            },
+            "KeySchema": {
+              "shape": "S23"
+            },
+            "TableCreationDateTime": {
+              "type": "timestamp"
+            },
+            "ProvisionedThroughput": {
+              "shape": "S2e"
+            },
+            "ItemCount": {
+              "type": "long"
+            },
+            "BillingMode": {}
+          }
+        },
+        "SourceTableFeatureDetails": {
+          "type": "structure",
+          "members": {
+            "LocalSecondaryIndexes": {
+              "type": "list",
+              "member": {
+                "type": "structure",
+                "members": {
+                  "IndexName": {},
+                  "KeySchema": {
+                    "shape": "S23"
+                  },
+                  "Projection": {
+                    "shape": "S28"
+                  }
+                }
+              }
+            },
+            "GlobalSecondaryIndexes": {
+              "type": "list",
+              "member": {
+                "type": "structure",
+                "members": {
+                  "IndexName": {},
+                  "KeySchema": {
+                    "shape": "S23"
+                  },
+                  "Projection": {
+                    "shape": "S28"
+                  },
+                  "ProvisionedThroughput": {
+                    "shape": "S2e"
+                  }
+                }
+              }
+            },
+            "StreamDescription": {
+              "shape": "S2h"
+            },
+            "TimeToLiveDescription": {
+              "shape": "S3l"
+            },
+            "SSEDescription": {
+              "shape": "S37"
+            }
+          }
+        }
+      }
+    },
+    "S3l": {
+      "type": "structure",
+      "members": {
+        "TimeToLiveStatus": {},
+        "AttributeName": {}
+      }
+    },
+    "S3p": {
+      "type": "map",
+      "key": {}

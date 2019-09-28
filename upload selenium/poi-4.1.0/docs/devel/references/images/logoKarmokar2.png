@@ -1,0 +1,295 @@
+the inner img JS from being sanitized
+            // so use the DOMParser strategy, if it is available.
+            // If the DOMParser is not available then we are not in Firefox (Server/WebWorker?) so we
+            // fall through to the default strategy below.
+            if (isDOMParserAvailable()) {
+                this.getInertBodyElement = this.getInertBodyElement_DOMParser;
+                return;
+            }
+        }
+        // None of the bugs were hit so it is safe for us to use the default InertDocument strategy
+        this.getInertBodyElement = this.getInertBodyElement_InertDocument;
+    }
+    /**
+     * Use XHR to create and fill an inert body element (on Safari 10.1)
+     * See
+     * https://github.com/cure53/DOMPurify/blob/a992d3a75031cb8bb032e5ea8399ba972bdf9a65/src/purify.js#L439-L449
+     * @private
+     * @param {?} html
+     * @return {?}
+     */
+    getInertBodyElement_XHR(html) {
+        // We add these extra elements to ensure that the rest of the content is parsed as expected
+        // e.g. leading whitespace is maintained and tags like `<meta>` do not get hoisted to the
+        // `<head>` tag.
+        html = '<body><remove></remove>' + html + '</body>';
+        try {
+            html = encodeURI(html);
+        }
+        catch (_a) {
+            return null;
+        }
+        /** @type {?} */
+        const xhr = new XMLHttpRequest();
+        xhr.responseType = 'document';
+        xhr.open('GET', 'data:text/html;charset=utf-8,' + html, false);
+        xhr.send(undefined);
+        /** @type {?} */
+        const body = xhr.response.body;
+        body.removeChild((/** @type {?} */ (body.firstChild)));
+        return body;
+    }
+    /**
+     * Use DOMParser to create and fill an inert body element (on Firefox)
+     * See https://github.com/cure53/DOMPurify/releases/tag/0.6.7
+     *
+     * @private
+     * @param {?} html
+     * @return {?}
+     */
+    getInertBodyElement_DOMParser(html) {
+        // We add these extra elements to ensure that the rest of the content is parsed as expected
+        // e.g. leading whitespace is maintained and tags like `<meta>` do not get hoisted to the
+        // `<head>` tag.
+        html = '<body><remove></remove>' + html + '</body>';
+        try {
+            /** @type {?} */
+            const body = (/** @type {?} */ (new ((/** @type {?} */ (window)))
+                .DOMParser()
+                .parseFromString(html, 'text/html')
+                .body));
+            body.removeChild((/** @type {?} */ (body.firstChild)));
+            return body;
+        }
+        catch (_a) {
+            return null;
+        }
+    }
+    /**
+     * Use an HTML5 `template` element, if supported, or an inert body element created via
+     * `createHtmlDocument` to create and fill an inert DOM element.
+     * This is the default sane strategy to use if the browser does not require one of the specialised
+     * strategies above.
+     * @private
+     * @param {?} html
+     * @return {?}
+     */
+    getInertBodyElement_InertDocument(html) {
+        // Prefer using <template> element if supported.
+        /** @type {?} */
+        const templateEl = this.inertDocument.createElement('template');
+        if ('content' in templateEl) {
+            templateEl.innerHTML = html;
+            return templateEl;
+        }
+        this.inertBodyElement.innerHTML = html;
+        // Support: IE 9-11 only
+        // strip custom-namespaced attributes on IE<=11
+        if (((/** @type {?} */ (this.defaultDoc))).documentMode) {
+            this.stripCustomNsAttrs(this.inertBodyElement);
+        }
+        return this.inertBodyElement;
+    }
+    /**
+     * When IE9-11 comes across an unknown namespaced attribute e.g. 'xlink:foo' it adds 'xmlns:ns1'
+     * attribute to declare ns1 namespace and prefixes the attribute with 'ns1' (e.g.
+     * 'ns1:xlink:foo').
+     *
+     * This is undesirable since we don't want to allow any of these custom attributes. This method
+     * strips them all.
+     * @private
+     * @param {?} el
+     * @return {?}
+     */
+    stripCustomNsAttrs(el) {
+        /** @type {?} */
+        const elAttrs = el.attributes;
+        // loop backwards so that we can support removals.
+        for (let i = elAttrs.length - 1; 0 < i; i--) {
+            /** @type {?} */
+            const attrib = elAttrs.item(i);
+            /** @type {?} */
+            const attrName = (/** @type {?} */ (attrib)).name;
+            if (attrName === 'xmlns:ns1' || attrName.indexOf('ns1:') === 0) {
+                el.removeAttribute(attrName);
+            }
+        }
+        /** @type {?} */
+        let childNode = (/** @type {?} */ (el.firstChild));
+        while (childNode) {
+            if (childNode.nodeType === Node.ELEMENT_NODE)
+                this.stripCustomNsAttrs((/** @type {?} */ (childNode)));
+            childNode = childNode.nextSibling;
+        }
+    }
+}
+/**
+ * We need to determine whether the DOMParser exists in the global context.
+ * The try-catch is because, on some browsers, trying to access this property
+ * on window can actually throw an error.
+ *
+ * @suppress {uselessCode}
+ * @return {?}
+ */
+function isDOMParserAvailable() {
+    try {
+        return !!((/** @type {?} */ (window))).DOMParser;
+    }
+    catch (_a) {
+        return false;
+    }
+}
+
+/**
+ * @fileoverview added by tsickle
+ * @suppress {checkTypes,extraRequire,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
+ */
+/**
+ * A pattern that recognizes a commonly useful subset of URLs that are safe.
+ *
+ * This regular expression matches a subset of URLs that will not cause script
+ * execution if used in URL context within a HTML document. Specifically, this
+ * regular expression matches if (comment from here on and regex copied from
+ * Soy's EscapingConventions):
+ * (1) Either a protocol in a whitelist (http, https, mailto or ftp).
+ * (2) or no protocol.  A protocol must be followed by a colon. The below
+ *     allows that by allowing colons only after one of the characters [/?#].
+ *     A colon after a hash (#) must be in the fragment.
+ *     Otherwise, a colon after a (?) must be in a query.
+ *     Otherwise, a colon after a single solidus (/) must be in a path.
+ *     Otherwise, a colon after a double solidus (//) must be in the authority
+ *     (before port).
+ *
+ * The pattern disallows &, used in HTML entity declarations before
+ * one of the characters in [/?#]. This disallows HTML entities used in the
+ * protocol name, which should never happen, e.g. "h&#116;tp" for "http".
+ * It also disallows HTML entities in the first path part of a relative path,
+ * e.g. "foo&lt;bar/baz".  Our existing escaping functions should not produce
+ * that. More importantly, it disallows masking of a colon,
+ * e.g. "javascript&#58;...".
+ *
+ * This regular expression was taken from the Closure sanitization library.
+ * @type {?}
+ */
+const SAFE_URL_PATTERN = /^(?:(?:https?|mailto|ftp|tel|file):|[^&:/?#]*(?:[/?#]|$))/gi;
+/**
+ * A pattern that matches safe data URLs. Only matches image, video and audio types.
+ * @type {?}
+ */
+const DATA_URL_PATTERN = /^data:(?:image\/(?:bmp|gif|jpeg|jpg|png|tiff|webp)|video\/(?:mpeg|mp4|ogg|webm)|audio\/(?:mp3|oga|ogg|opus));base64,[a-z0-9+\/]+=*$/i;
+/**
+ * @param {?} url
+ * @return {?}
+ */
+function _sanitizeUrl(url) {
+    url = String(url);
+    if (url.match(SAFE_URL_PATTERN) || url.match(DATA_URL_PATTERN))
+        return url;
+    if (isDevMode()) {
+        console.warn(`WARNING: sanitizing unsafe URL value ${url} (see http://g.co/ng/security#xss)`);
+    }
+    return 'unsafe:' + url;
+}
+/**
+ * @param {?} srcset
+ * @return {?}
+ */
+function sanitizeSrcset(srcset) {
+    srcset = String(srcset);
+    return srcset.split(',').map((srcset) => _sanitizeUrl(srcset.trim())).join(', ');
+}
+
+/**
+ * @fileoverview added by tsickle
+ * @suppress {checkTypes,extraRequire,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
+ */
+/**
+ * @param {?} tags
+ * @return {?}
+ */
+function tagSet(tags) {
+    /** @type {?} */
+    const res = {};
+    for (const t of tags.split(','))
+        res[t] = true;
+    return res;
+}
+/**
+ * @param {...?} sets
+ * @return {?}
+ */
+function merge$1(...sets) {
+    /** @type {?} */
+    const res = {};
+    for (const s of sets) {
+        for (const v in s) {
+            if (s.hasOwnProperty(v))
+                res[v] = true;
+        }
+    }
+    return res;
+}
+// Good source of info about elements and attributes
+// http://dev.w3.org/html5/spec/Overview.html#semantics
+// http://simon.html5.org/html-elements
+// Safe Void Elements - HTML5
+// http://dev.w3.org/html5/spec/Overview.html#void-elements
+/** @type {?} */
+const VOID_ELEMENTS = tagSet('area,br,col,hr,img,wbr');
+// Elements that you can, intentionally, leave open (and which close themselves)
+// http://dev.w3.org/html5/spec/Overview.html#optional-tags
+/** @type {?} */
+const OPTIONAL_END_TAG_BLOCK_ELEMENTS = tagSet('colgroup,dd,dt,li,p,tbody,td,tfoot,th,thead,tr');
+/** @type {?} */
+const OPTIONAL_END_TAG_INLINE_ELEMENTS = tagSet('rp,rt');
+/** @type {?} */
+const OPTIONAL_END_TAG_ELEMENTS = merge$1(OPTIONAL_END_TAG_INLINE_ELEMENTS, OPTIONAL_END_TAG_BLOCK_ELEMENTS);
+// Safe Block Elements - HTML5
+/** @type {?} */
+const BLOCK_ELEMENTS = merge$1(OPTIONAL_END_TAG_BLOCK_ELEMENTS, tagSet('address,article,' +
+    'aside,blockquote,caption,center,del,details,dialog,dir,div,dl,figure,figcaption,footer,h1,h2,h3,h4,h5,' +
+    'h6,header,hgroup,hr,ins,main,map,menu,nav,ol,pre,section,summary,table,ul'));
+// Inline Elements - HTML5
+/** @type {?} */
+const INLINE_ELEMENTS = merge$1(OPTIONAL_END_TAG_INLINE_ELEMENTS, tagSet('a,abbr,acronym,audio,b,' +
+    'bdi,bdo,big,br,cite,code,del,dfn,em,font,i,img,ins,kbd,label,map,mark,picture,q,ruby,rp,rt,s,' +
+    'samp,small,source,span,strike,strong,sub,sup,time,track,tt,u,var,video'));
+/** @type {?} */
+const VALID_ELEMENTS = merge$1(VOID_ELEMENTS, BLOCK_ELEMENTS, INLINE_ELEMENTS, OPTIONAL_END_TAG_ELEMENTS);
+// Attributes that have href and hence need to be sanitized
+/** @type {?} */
+const URI_ATTRS = tagSet('background,cite,href,itemtype,longdesc,poster,src,xlink:href');
+// Attributes that have special href set hence need to be sanitized
+/** @type {?} */
+const SRCSET_ATTRS = tagSet('srcset');
+/** @type {?} */
+const HTML_ATTRS = tagSet('abbr,accesskey,align,alt,autoplay,axis,bgcolor,border,cellpadding,cellspacing,class,clear,color,cols,colspan,' +
+    'compact,controls,coords,datetime,default,dir,download,face,headers,height,hidden,hreflang,hspace,' +
+    'ismap,itemscope,itemprop,kind,label,lang,language,loop,media,muted,nohref,nowrap,open,preload,rel,rev,role,rows,rowspan,rules,' +
+    'scope,scrolling,shape,size,sizes,span,srclang,start,summary,tabindex,target,title,translate,type,usemap,' +
+    'valign,value,vspace,width');
+// NB: This currently consciously doesn't support SVG. SVG sanitization has had several security
+// issues in the past, so it seems safer to leave it out if possible. If support for binding SVG via
+// innerHTML is required, SVG attributes should be added here.
+// NB: Sanitization does not allow <form> elements or other active elements (<button> etc). Those
+// can be sanitized, but they increase security surface area without a legitimate use case, so they
+// are left out here.
+/** @type {?} */
+const VALID_ATTRS = merge$1(URI_ATTRS, SRCSET_ATTRS, HTML_ATTRS);
+/**
+ * SanitizingHtmlSerializer serializes a DOM fragment, stripping out any unsafe elements and unsafe
+ * attributes.
+ */
+class SanitizingHtmlSerializer {
+    constructor() {
+        // Explicitly track if something was stripped, to avoid accidentally warning of sanitization just
+        // because characters were re-encoded.
+        this.sanitizedSomething = false;
+        this.buf = [];
+    }
+    /**
+     * @param {?} el
+     * @return {?}
+     */
+    sanitizeChildren(el) {
+        // This can

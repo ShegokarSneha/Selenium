@@ -1,0 +1,113 @@
+
+ * @param {?} exportsMap
+ * @return {?}
+ */
+function saveNameToExportMap(index, def, exportsMap) {
+    if (exportsMap) {
+        if (def.exportAs)
+            exportsMap[def.exportAs] = index;
+        if (((/** @type {?} */ (def))).template)
+            exportsMap[''] = index;
+    }
+}
+/**
+ * Initializes the flags on the current node, setting all indices to the initial index,
+ * the directive count to 0, and adding the isComponent flag.
+ * @param {?} tNode
+ * @param {?} index the initial index
+ * @param {?} numberOfDirectives
+ * @return {?}
+ */
+function initNodeFlags(tNode, index, numberOfDirectives) {
+    ngDevMode && assertEqual(getFirstTemplatePass(), true, 'expected firstTemplatePass to be true');
+    /** @type {?} */
+    const flags = tNode.flags;
+    ngDevMode && assertEqual(flags === 0 || flags === 1 /* isComponent */, true, 'expected node flags to not be initialized');
+    ngDevMode && assertNotEqual(numberOfDirectives, tNode.directiveEnd - tNode.directiveStart, 'Reached the max number of directives');
+    // When the first directive is created on a node, save the index
+    tNode.flags = flags & 1 /* isComponent */;
+    tNode.directiveStart = index;
+    tNode.directiveEnd = index + numberOfDirectives;
+    tNode.providerIndexes = index;
+}
+/**
+ * @template T
+ * @param {?} tView
+ * @param {?} viewData
+ * @param {?} def
+ * @param {?} directiveFactory
+ * @return {?}
+ */
+function baseResolveDirective(tView, viewData, def, directiveFactory) {
+    tView.data.push(def);
+    /** @type {?} */
+    const nodeInjectorFactory = new NodeInjectorFactory(directiveFactory, isComponentDef(def), null);
+    tView.blueprint.push(nodeInjectorFactory);
+    viewData.push(nodeInjectorFactory);
+}
+/**
+ * @template T
+ * @param {?} lView
+ * @param {?} previousOrParentTNode
+ * @param {?} def
+ * @return {?}
+ */
+function addComponentLogic(lView, previousOrParentTNode, def) {
+    /** @type {?} */
+    const native = getNativeByTNode(previousOrParentTNode, lView);
+    /** @type {?} */
+    const tView = getOrCreateTView(def.template, def.consts, def.vars, def.directiveDefs, def.pipeDefs, def.viewQuery);
+    // Only component views should be added to the view tree directly. Embedded views are
+    // accessed through their containers because they may be removed / re-added later.
+    /** @type {?} */
+    const rendererFactory = lView[RENDERER_FACTORY];
+    /** @type {?} */
+    const componentView = addToViewTree(lView, (/** @type {?} */ (previousOrParentTNode.index)), createLView(lView, tView, null, def.onPush ? 8 /* Dirty */ : 4 /* CheckAlways */, rendererFactory, lView[RENDERER_FACTORY].createRenderer((/** @type {?} */ (native)), def)));
+    componentView[HOST_NODE] = (/** @type {?} */ (previousOrParentTNode));
+    // Component view will always be created before any injected LContainers,
+    // so this is a regular element, wrap it with the component view
+    componentView[HOST] = lView[previousOrParentTNode.index];
+    lView[previousOrParentTNode.index] = componentView;
+    if (getFirstTemplatePass()) {
+        queueComponentIndexForCheck(previousOrParentTNode);
+    }
+}
+/**
+ * Sets initial input properties on directive instances from attribute data
+ *
+ * @template T
+ * @param {?} directiveIndex Index of the directive in directives array
+ * @param {?} instance Instance of the directive on which to set the initial inputs
+ * @param {?} inputs The list of inputs from the directive def
+ * @param {?} tNode The static data for this node
+ * @return {?}
+ */
+function setInputsFromAttrs(directiveIndex, instance, inputs, tNode) {
+    /** @type {?} */
+    let initialInputData = (/** @type {?} */ (tNode.initialInputs));
+    if (initialInputData === undefined || directiveIndex >= initialInputData.length) {
+        initialInputData = generateInitialInputs(directiveIndex, inputs, tNode);
+    }
+    /** @type {?} */
+    const initialInputs = initialInputData[directiveIndex];
+    if (initialInputs) {
+        for (let i = 0; i < initialInputs.length; i += 2) {
+            ((/** @type {?} */ (instance)))[initialInputs[i]] = initialInputs[i + 1];
+        }
+    }
+}
+/**
+ * Generates initialInputData for a node and stores it in the template's static storage
+ * so subsequent template invocations don't have to recalculate it.
+ *
+ * initialInputData is an array containing values that need to be set as input properties
+ * for directives on this node, but only once on creation. We need this array to support
+ * the case where you set an \@Input property of a directive using attribute-like syntax.
+ * e.g. if you have a `name` \@Input, you can set it once like this:
+ *
+ * <my-component name="Bess"></my-component>
+ *
+ * @param {?} directiveIndex Index to store the initial input data
+ * @param {?} inputs The list of inputs from the directive def
+ * @param {?} tNode The static data on this node
+ * @return {?}

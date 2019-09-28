@@ -1,0 +1,244 @@
+Message, ts.getTextOfNode(errorInfo.typeName), symbolAccessibilityResult.errorSymbolName, symbolAccessibilityResult.errorModuleName));
+                    }
+                    else {
+                        context.addDiagnostic(ts.createDiagnosticForNode(symbolAccessibilityResult.errorNode || errorInfo.errorNode, errorInfo.diagnosticMessage, symbolAccessibilityResult.errorSymbolName, symbolAccessibilityResult.errorModuleName));
+                    }
+                }
+            }
+        }
+        function trackExternalModuleSymbolOfImportTypeNode(symbol) {
+            if (!isBundledEmit) {
+                (exportedModulesFromDeclarationEmit || (exportedModulesFromDeclarationEmit = [])).push(symbol);
+            }
+        }
+        function trackSymbol(symbol, enclosingDeclaration, meaning) {
+            if (symbol.flags & 262144)
+                return;
+            handleSymbolAccessibilityError(resolver.isSymbolAccessible(symbol, enclosingDeclaration, meaning, true));
+            recordTypeReferenceDirectivesIfNecessary(resolver.getTypeReferenceDirectivesForSymbol(symbol, meaning));
+        }
+        function reportPrivateInBaseOfClassExpression(propertyName) {
+            if (errorNameNode) {
+                context.addDiagnostic(ts.createDiagnosticForNode(errorNameNode, ts.Diagnostics.Property_0_of_exported_class_expression_may_not_be_private_or_protected, propertyName));
+            }
+        }
+        function reportInaccessibleUniqueSymbolError() {
+            if (errorNameNode) {
+                context.addDiagnostic(ts.createDiagnosticForNode(errorNameNode, ts.Diagnostics.The_inferred_type_of_0_references_an_inaccessible_1_type_A_type_annotation_is_necessary, ts.declarationNameToString(errorNameNode), "unique symbol"));
+            }
+        }
+        function reportInaccessibleThisError() {
+            if (errorNameNode) {
+                context.addDiagnostic(ts.createDiagnosticForNode(errorNameNode, ts.Diagnostics.The_inferred_type_of_0_references_an_inaccessible_1_type_A_type_annotation_is_necessary, ts.declarationNameToString(errorNameNode), "this"));
+            }
+        }
+        function reportLikelyUnsafeImportRequiredError(specifier) {
+            if (errorNameNode) {
+                context.addDiagnostic(ts.createDiagnosticForNode(errorNameNode, ts.Diagnostics.The_inferred_type_of_0_cannot_be_named_without_a_reference_to_1_This_is_likely_not_portable_A_type_annotation_is_necessary, ts.declarationNameToString(errorNameNode), specifier));
+            }
+        }
+        function transformRoot(node) {
+            if (node.kind === 279 && (node.isDeclarationFile || ts.isSourceFileJS(node))) {
+                return node;
+            }
+            if (node.kind === 280) {
+                isBundledEmit = true;
+                refs = ts.createMap();
+                libs = ts.createMap();
+                var hasNoDefaultLib_1 = false;
+                var bundle = ts.createBundle(ts.map(node.sourceFiles, function (sourceFile) {
+                    if (sourceFile.isDeclarationFile || ts.isSourceFileJS(sourceFile))
+                        return undefined;
+                    hasNoDefaultLib_1 = hasNoDefaultLib_1 || sourceFile.hasNoDefaultLib;
+                    currentSourceFile = sourceFile;
+                    enclosingDeclaration = sourceFile;
+                    lateMarkedStatements = undefined;
+                    suppressNewDiagnosticContexts = false;
+                    lateStatementReplacementMap = ts.createMap();
+                    getSymbolAccessibilityDiagnostic = throwDiagnostic;
+                    needsScopeFixMarker = false;
+                    resultHasScopeMarker = false;
+                    collectReferences(sourceFile, refs);
+                    collectLibs(sourceFile, libs);
+                    if (ts.isExternalModule(sourceFile)) {
+                        resultHasExternalModuleIndicator = false;
+                        needsDeclare = false;
+                        var statements_4 = ts.visitNodes(sourceFile.statements, visitDeclarationStatements);
+                        var newFile = ts.updateSourceFileNode(sourceFile, [ts.createModuleDeclaration([], [ts.createModifier(125)], ts.createLiteral(ts.getResolvedExternalModuleName(context.getEmitHost(), sourceFile)), ts.createModuleBlock(ts.setTextRange(ts.createNodeArray(transformAndReplaceLatePaintedStatements(statements_4)), sourceFile.statements)))], true, [], [], false, []);
+                        return newFile;
+                    }
+                    needsDeclare = true;
+                    var updated = ts.visitNodes(sourceFile.statements, visitDeclarationStatements);
+                    return ts.updateSourceFileNode(sourceFile, transformAndReplaceLatePaintedStatements(updated), true, [], [], false, []);
+                }), ts.mapDefined(node.prepends, function (prepend) {
+                    if (prepend.kind === 282) {
+                        return ts.createUnparsedSourceFile(prepend.declarationText, prepend.declarationMapPath, prepend.declarationMapText);
+                    }
+                }));
+                bundle.syntheticFileReferences = [];
+                bundle.syntheticTypeReferences = getFileReferencesForUsedTypeReferences();
+                bundle.syntheticLibReferences = getLibReferences();
+                bundle.hasNoDefaultLib = hasNoDefaultLib_1;
+                var outputFilePath_1 = ts.getDirectoryPath(ts.normalizeSlashes(ts.getOutputPathsFor(node, host, true).declarationFilePath));
+                var referenceVisitor_1 = mapReferencesIntoArray(bundle.syntheticFileReferences, outputFilePath_1);
+                refs.forEach(referenceVisitor_1);
+                return bundle;
+            }
+            needsDeclare = true;
+            needsScopeFixMarker = false;
+            resultHasScopeMarker = false;
+            enclosingDeclaration = node;
+            currentSourceFile = node;
+            getSymbolAccessibilityDiagnostic = throwDiagnostic;
+            isBundledEmit = false;
+            resultHasExternalModuleIndicator = false;
+            suppressNewDiagnosticContexts = false;
+            lateMarkedStatements = undefined;
+            lateStatementReplacementMap = ts.createMap();
+            necessaryTypeReferences = undefined;
+            refs = collectReferences(currentSourceFile, ts.createMap());
+            libs = collectLibs(currentSourceFile, ts.createMap());
+            var references = [];
+            var outputFilePath = ts.getDirectoryPath(ts.normalizeSlashes(ts.getOutputPathsFor(node, host, true).declarationFilePath));
+            var referenceVisitor = mapReferencesIntoArray(references, outputFilePath);
+            var statements = ts.visitNodes(node.statements, visitDeclarationStatements);
+            var combinedStatements = ts.setTextRange(ts.createNodeArray(transformAndReplaceLatePaintedStatements(statements)), node.statements);
+            refs.forEach(referenceVisitor);
+            var emittedImports = ts.filter(combinedStatements, ts.isAnyImportSyntax);
+            if (ts.isExternalModule(node) && (!resultHasExternalModuleIndicator || (needsScopeFixMarker && !resultHasScopeMarker))) {
+                combinedStatements = ts.setTextRange(ts.createNodeArray(combinedStatements.concat([ts.createExportDeclaration(undefined, undefined, ts.createNamedExports([]), undefined)])), combinedStatements);
+            }
+            var updated = ts.updateSourceFileNode(node, combinedStatements, true, references, getFileReferencesForUsedTypeReferences(), node.hasNoDefaultLib, getLibReferences());
+            updated.exportedModulesFromDeclarationEmit = exportedModulesFromDeclarationEmit;
+            return updated;
+            function getLibReferences() {
+                return ts.map(ts.arrayFrom(libs.keys()), function (lib) { return ({ fileName: lib, pos: -1, end: -1 }); });
+            }
+            function getFileReferencesForUsedTypeReferences() {
+                return necessaryTypeReferences ? ts.mapDefined(ts.arrayFrom(necessaryTypeReferences.keys()), getFileReferenceForTypeName) : [];
+            }
+            function getFileReferenceForTypeName(typeName) {
+                if (emittedImports) {
+                    for (var _i = 0, emittedImports_1 = emittedImports; _i < emittedImports_1.length; _i++) {
+                        var importStatement = emittedImports_1[_i];
+                        if (ts.isImportEqualsDeclaration(importStatement) && ts.isExternalModuleReference(importStatement.moduleReference)) {
+                            var expr = importStatement.moduleReference.expression;
+                            if (ts.isStringLiteralLike(expr) && expr.text === typeName) {
+                                return undefined;
+                            }
+                        }
+                        else if (ts.isImportDeclaration(importStatement) && ts.isStringLiteral(importStatement.moduleSpecifier) && importStatement.moduleSpecifier.text === typeName) {
+                            return undefined;
+                        }
+                    }
+                }
+                return { fileName: typeName, pos: -1, end: -1 };
+            }
+            function mapReferencesIntoArray(references, outputFilePath) {
+                return function (file) {
+                    var declFileName;
+                    if (file.isDeclarationFile) {
+                        declFileName = file.fileName;
+                    }
+                    else {
+                        if (isBundledEmit && ts.contains(node.sourceFiles, file))
+                            return;
+                        var paths = ts.getOutputPathsFor(file, host, true);
+                        declFileName = paths.declarationFilePath || paths.jsFilePath || file.fileName;
+                    }
+                    if (declFileName) {
+                        var fileName = ts.getRelativePathToDirectoryOrUrl(outputFilePath, declFileName, host.getCurrentDirectory(), host.getCanonicalFileName, false);
+                        if (ts.startsWith(fileName, "./") && ts.hasExtension(fileName)) {
+                            fileName = fileName.substring(2);
+                        }
+                        if (ts.startsWith(fileName, "node_modules/") || fileName.indexOf("/node_modules/") !== -1) {
+                            return;
+                        }
+                        references.push({ pos: -1, end: -1, fileName: fileName });
+                    }
+                };
+            }
+        }
+        function collectReferences(sourceFile, ret) {
+            if (noResolve || ts.isSourceFileJS(sourceFile))
+                return ret;
+            ts.forEach(sourceFile.referencedFiles, function (f) {
+                var elem = ts.tryResolveScriptReference(host, sourceFile, f);
+                if (elem) {
+                    ret.set("" + ts.getOriginalNodeId(elem), elem);
+                }
+            });
+            return ret;
+        }
+        function collectLibs(sourceFile, ret) {
+            ts.forEach(sourceFile.libReferenceDirectives, function (ref) {
+                var lib = host.getLibFileFromReference(ref);
+                if (lib) {
+                    ret.set(ref.fileName.toLocaleLowerCase(), true);
+                }
+            });
+            return ret;
+        }
+        function filterBindingPatternInitializers(name) {
+            if (name.kind === 72) {
+                return name;
+            }
+            else {
+                if (name.kind === 185) {
+                    return ts.updateArrayBindingPattern(name, ts.visitNodes(name.elements, visitBindingElement));
+                }
+                else {
+                    return ts.updateObjectBindingPattern(name, ts.visitNodes(name.elements, visitBindingElement));
+                }
+            }
+            function visitBindingElement(elem) {
+                if (elem.kind === 210) {
+                    return elem;
+                }
+                return ts.updateBindingElement(elem, elem.dotDotDotToken, elem.propertyName, filterBindingPatternInitializers(elem.name), shouldPrintWithInitializer(elem) ? elem.initializer : undefined);
+            }
+        }
+        function ensureParameter(p, modifierMask) {
+            var oldDiag;
+            if (!suppressNewDiagnosticContexts) {
+                oldDiag = getSymbolAccessibilityDiagnostic;
+                getSymbolAccessibilityDiagnostic = ts.createGetSymbolAccessibilityDiagnosticForNode(p);
+            }
+            var newParam = ts.updateParameter(p, undefined, maskModifiers(p, modifierMask), p.dotDotDotToken, filterBindingPatternInitializers(p.name), resolver.isOptionalParameter(p) ? (p.questionToken || ts.createToken(56)) : undefined, ensureType(p, p.type, true), ensureNoInitializer(p));
+            if (!suppressNewDiagnosticContexts) {
+                getSymbolAccessibilityDiagnostic = oldDiag;
+            }
+            return newParam;
+        }
+        function shouldPrintWithInitializer(node) {
+            return canHaveLiteralInitializer(node) && resolver.isLiteralConstDeclaration(ts.getParseTreeNode(node));
+        }
+        function ensureNoInitializer(node) {
+            if (shouldPrintWithInitializer(node)) {
+                return resolver.createLiteralConstValue(ts.getParseTreeNode(node), symbolTracker);
+            }
+            return undefined;
+        }
+        function ensureType(node, type, ignorePrivate) {
+            if (!ignorePrivate && ts.hasModifier(node, 8)) {
+                return;
+            }
+            if (shouldPrintWithInitializer(node)) {
+                return;
+            }
+            var shouldUseResolverType = node.kind === 151 &&
+                (resolver.isRequiredInitializedParameter(node) ||
+                    resolver.isOptionalUninitializedParameterProperty(node));
+            if (type && !shouldUseResolverType) {
+                return ts.visitNode(type, visitDeclarationSubtree);
+            }
+            if (!ts.getParseTreeNode(node)) {
+                return type ? ts.visitNode(type, visitDeclarationSubtree) : ts.createKeywordTypeNode(120);
+            }
+            if (node.kind === 159) {
+                return ts.createKeywordTypeNode(120);
+            }
+            errorNameNode = node.name;
+            var oldDiag;
+            if (!suppressNewDiagnosticContexts) {
+                oldDiag = getSymbolAccessibilityDiagnostic;
