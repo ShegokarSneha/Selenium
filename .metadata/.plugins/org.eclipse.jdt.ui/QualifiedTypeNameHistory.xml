@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <qualifiedTypeNameHistroy>
-    <fullyQualifiedTypeName name="org.apache.bcel.generic.Select"/>
     <fullyQualifiedTypeName name="javax.crypto.SealedObject"/>
     <fullyQualifiedTypeName name="com.beust.jcommander.Parameter"/>
     <fullyQualifiedTypeName name="com.beust.jcommander.Parameters"/>
     <fullyQualifiedTypeName name="org.testng.annotations.Parameters"/>
-    <fullyQualifiedTypeName name="org.openqa.selenium.firefox.FirefoxDriver"/>
     <fullyQualifiedTypeName name="atu.testrecorder.ATUTestRecorder"/>
     <fullyQualifiedTypeName name="org.testng.Reporter"/>
     <fullyQualifiedTypeName name="org.testng.annotations.BeforeTest"/>
@@ -32,13 +30,11 @@
     <fullyQualifiedTypeName name="java.lang.Thread"/>
     <fullyQualifiedTypeName name="org.testng.SkipException"/>
     <fullyQualifiedTypeName name="org.automationtesting.excelreport.Xl"/>
-    <fullyQualifiedTypeName name="org.openqa.selenium.WebDriver"/>
     <fullyQualifiedTypeName name="org.apache.poi.xssf.usermodel.XSSFWorkbook"/>
     <fullyQualifiedTypeName name="org.apache.poi.xssf.usermodel.XSSFSheet"/>
     <fullyQualifiedTypeName name="java.util.Map"/>
     <fullyQualifiedTypeName name="java.util.Properties"/>
     <fullyQualifiedTypeName name="java.io.FileInputStream"/>
-    <fullyQualifiedTypeName name="org.openqa.selenium.By"/>
     <fullyQualifiedTypeName name="java.io.FileOutputStream"/>
     <fullyQualifiedTypeName name="java.io.File"/>
     <fullyQualifiedTypeName name="java.io.FileNotFoundException"/>
@@ -48,7 +44,6 @@
     <fullyQualifiedTypeName name="org.apache.poi.ss.usermodel.Row"/>
     <fullyQualifiedTypeName name="java.util.Set"/>
     <fullyQualifiedTypeName name="org.openqa.selenium.chrome.ChromeDriver"/>
-    <fullyQualifiedTypeName name="java.util.concurrent.TimeUnit"/>
     <fullyQualifiedTypeName name="java.util.LinkedHashMap"/>
     <fullyQualifiedTypeName name="org.openqa.selenium.WebElement"/>
     <fullyQualifiedTypeName name="org.testng.annotations.Test"/>
@@ -57,7 +52,12 @@
     <fullyQualifiedTypeName name="org.testng.AssertJUnit"/>
     <fullyQualifiedTypeName name="org.testng.annotations.AfterClass"/>
     <fullyQualifiedTypeName name="com.common.excelreport.ExcelReportGenerator"/>
+    <fullyQualifiedTypeName name="Pages.FundooPushDashboard"/>
     <fullyQualifiedTypeName name="TestRunners.TestDefaultValues"/>
     <fullyQualifiedTypeName name="Pages.FundooPushLoginPage"/>
-    <fullyQualifiedTypeName name="Pages.FundooPushDashboard"/>
+    <fullyQualifiedTypeName name="org.openqa.selenium.firefox.FirefoxProfile"/>
+    <fullyQualifiedTypeName name="java.util.concurrent.TimeUnit"/>
+    <fullyQualifiedTypeName name="org.openqa.selenium.By"/>
+    <fullyQualifiedTypeName name="org.openqa.selenium.WebDriver"/>
+    <fullyQualifiedTypeName name="org.openqa.selenium.firefox.FirefoxDriver"/>
 </qualifiedTypeNameHistroy>

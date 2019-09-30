@@ -1,8 +1,0 @@
-package recording;
-
-public class ScreenTestRecording {
-	
-	@BeforeTest
-	public 
-
-}

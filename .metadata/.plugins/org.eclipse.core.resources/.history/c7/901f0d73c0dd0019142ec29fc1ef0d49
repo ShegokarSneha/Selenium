@@ -1,5 +1,0 @@
-KEYWORD_PATH = /home/admin1/eclipse-workspace/KeywordDrivenFramework/dataFile/keywords.xlsx
-URL = https://demo.guru99.com/v4/
-USERID=	uid
-PASSWORD = password
-LOGIN_BTN=btnLogin

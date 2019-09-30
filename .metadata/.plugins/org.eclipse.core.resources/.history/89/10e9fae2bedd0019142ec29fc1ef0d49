@@ -1,5 +1,0 @@
-KEYWORD_PATH = ./dataFile/keywordfile.xlsx
-URL = https://demo.guru99.com/v4/
-USERID=	uid
-PASSWORD = password
-LOGIN_BTN=btnLogin
